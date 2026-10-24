@@ -1,0 +1,96 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Bookings | Eventify</title>
+
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/bookings.css">
+
+    <script src="js/bookings.js" defer></script>
+</head>
+<body class="bookings-page">
+
+    <nav class="navbar">
+        <a href="index.html" class="logo">Eventify<span>.</span></a>
+
+        <div class="nav-links">
+            <a href="index.html">Explore Events</a>
+            <a href="bookings.html" class="active">My Bookings</a>
+            <a href="login.html">Login</a>
+        </div>
+    </nav>
+
+    <main class="bookings-container">
+
+        <section class="bookings-header">
+            <div>
+                <p class="section-label">YOUR EVENT SPACE</p>
+                <h1>My Bookings<span>.</span></h1>
+                <p class="bookings-subtitle">
+                    Keep track of your tickets and upcoming experiences.
+                </p>
+            </div>
+
+            <a href="index.html" class="explore-button">
+                + Explore Events
+            </a>
+        </section>
+
+        <section class="booking-stats">
+            <article class="stat-card">
+                <span class="stat-icon">🎟️</span>
+                <p>Total Bookings</p>
+                <h2 id="total-bookings">0</h2>
+            </article>
+
+            <article class="stat-card">
+                <span class="stat-icon">📅</span>
+                <p>Upcoming Events</p>
+                <h2 id="upcoming-bookings">0</h2>
+            </article>
+
+            <article class="stat-card">
+                <span class="stat-icon">💳</span>
+                <p>Total Amount</p>
+                <h2 id="total-amount">₹0</h2>
+            </article>
+        </section>
+
+        <section class="bookings-list-section">
+            <div class="bookings-toolbar">
+                <div>
+                    <h2>Your Tickets</h2>
+                    <p>Manage your event reservations.</p>
+                </div>
+
+                <select id="booking-filter" aria-label="Filter bookings">
+                    <option value="ALL">All Bookings</option>
+                    <option value="CONFIRMED">Confirmed</option>
+                    <option value="CANCELLED">Cancelled</option>
+                    <option value="COMPLETED">Completed</option>
+                </select>
+            </div>
+
+            <div id="bookings-list" class="bookings-list"></div>
+        </section>
+
+        <section class="booking-help">
+            <div>
+                <h3>Ready for your next experience?</h3>
+                <p>Discover workshops, concerts, meetups and more.</p>
+            </div>
+
+            <a href="index.html">Discover Events →</a>
+        </section>
+
+    </main>
+
+    <footer class="footer">
+        <p>© 2026 Eventify. Made for unforgettable experiences.</p>
+    </footer>
+
+</body>
+</html>

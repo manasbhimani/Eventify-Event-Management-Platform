@@ -1,0 +1,180 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Organizer Dashboard | Eventify</title>
+
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/organizer.css">
+    <script src="js/organizer.js" defer></script>
+</head>
+<body class="organizer-page">
+
+    <nav class="navbar">
+        <a href="index.html" class="logo">Eventify<span>.</span></a>
+        <div class="nav-links">
+            <a href="index.html">Explore Events</a>
+            <a href="bookings.html">My Bookings</a>
+            <a href="login.html">Login</a>
+        </div>
+    </nav>
+
+    <main class="organizer-container">
+
+        <section class="organizer-heading">
+            <div>
+                <p class="eyebrow">ORGANIZER WORKSPACE</p>
+                <h1>Manage your events<span>.</span></h1>
+                <p class="muted">
+                    Create events, manage ticket inventory, and track registrations.
+                </p>
+            </div>
+
+            <button id="open-event-form" class="primary-button">
+                + Create Event
+            </button>
+        </section>
+
+        <section class="organizer-stats">
+            <article class="organizer-stat">
+                <span>📅</span>
+                <p>Total Events</p>
+                <h2 id="stat-events">0</h2>
+            </article>
+
+            <article class="organizer-stat">
+                <span>🎟️</span>
+                <p>Tickets Available</p>
+                <h2 id="stat-tickets">0</h2>
+            </article>
+
+            <article class="organizer-stat">
+                <span>👥</span>
+                <p>Registrations</p>
+                <h2 id="stat-registrations">0</h2>
+            </article>
+
+            <article class="organizer-stat">
+                <span>💰</span>
+                <p>Potential Ticket Value</p>
+                <h2 id="stat-value">₹0</h2>
+            </article>
+        </section>
+
+        <section id="event-form-section" class="event-form-section" hidden>
+            <div class="form-heading">
+                <div>
+                    <h2>Create a new event</h2>
+                    <p class="muted">Enter the details for your next event.</p>
+                </div>
+
+                <button id="close-event-form" class="close-button"
+                    type="button" aria-label="Close form">✕</button>
+            </div>
+
+            <form id="create-event-form">
+                <div class="form-grid">
+                    <div class="form-field full-width">
+                        <label for="event-title">Event name</label>
+                        <input id="event-title" type="text"
+                            maxlength="100" required
+                            placeholder="e.g. Web Development Bootcamp">
+                    </div>
+
+                    <div class="form-field">
+                        <label for="event-category">Category</label>
+                        <select id="event-category" required>
+                            <option value="Technology">Technology</option>
+                            <option value="Music">Music</option>
+                            <option value="Workshop">Workshop</option>
+                            <option value="Business">Business</option>
+                            <option value="Sports">Sports</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+
+                    <div class="form-field">
+                        <label for="event-city">City</label>
+                        <input id="event-city" type="text"
+                            maxlength="80" required placeholder="e.g. Surat">
+                    </div>
+
+                    <div class="form-field full-width">
+                        <label for="event-venue">Venue</label>
+                        <input id="event-venue" type="text"
+                            maxlength="150" required
+                            placeholder="Enter the event venue">
+                    </div>
+
+                    <div class="form-field">
+                        <label for="event-date">Event date</label>
+                        <input id="event-date" type="date" required>
+                    </div>
+
+                    <div class="form-field">
+                        <label for="event-time">Start time</label>
+                        <input id="event-time" type="time" required>
+                    </div>
+
+                    <div class="form-field">
+                        <label for="event-price">Ticket price (₹)</label>
+                        <input id="event-price" type="number"
+                            min="0" max="10000000" step="1"
+                            value="199" required>
+                    </div>
+
+                    <div class="form-field">
+                        <label for="event-capacity">Ticket quantity</label>
+                        <input id="event-capacity" type="number"
+                            min="1" max="1000000" value="100" required>
+                    </div>
+
+                    <div class="form-field full-width">
+                        <label for="event-description">Description</label>
+                        <textarea id="event-description"
+                            maxlength="1500" rows="4"
+                            placeholder="Describe your event..."></textarea>
+                    </div>
+                </div>
+
+                <p id="event-form-message" class="form-message"
+                    role="status"></p>
+
+                <button type="submit" class="primary-button">
+                    Create Demo Event
+                </button>
+            </form>
+        </section>
+
+        <section class="managed-events">
+            <div class="events-toolbar">
+                <div>
+                    <h2>Your Events</h2>
+                    <p class="muted">Review and manage your event listings.</p>
+                </div>
+
+                <select id="status-filter" aria-label="Filter by event status">
+                    <option value="ALL">All Events</option>
+                    <option value="PUBLISHED">Published</option>
+                    <option value="DRAFT">Draft</option>
+                    <option value="CANCELLED">Cancelled</option>
+                </select>
+            </div>
+
+            <div id="organizer-events" class="organizer-events"></div>
+        </section>
+
+        <p class="demo-notice">
+            Demo dashboard: changes are temporary and are not saved to the database.
+        </p>
+
+    </main>
+
+    <footer class="footer">
+        <p>© 2026 Eventify. Made for unforgettable experiences.</p>
+    </footer>
+
+</body>
+</html>

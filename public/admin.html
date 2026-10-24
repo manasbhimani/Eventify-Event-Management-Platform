@@ -1,0 +1,151 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard | Eventify</title>
+
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/admin.css">
+    <script src="js/admin.js" defer></script>
+</head>
+<body class="admin-page">
+
+    <nav class="navbar">
+        <a href="index.html" class="logo">Eventify<span>.</span></a>
+
+        <div class="nav-links">
+            <a href="index.html">Explore Events</a>
+            <a href="organizer.html">Organizer</a>
+            <a href="login.html">Login</a>
+        </div>
+    </nav>
+
+    <main class="admin-container">
+
+        <section class="admin-heading">
+            <div>
+                <p class="eyebrow">PLATFORM MANAGEMENT</p>
+                <h1>Admin Dashboard<span>.</span></h1>
+                <p class="muted">
+                    Monitor users, event listings, and platform categories.
+                </p>
+            </div>
+
+            <span class="admin-badge">ADMIN DEMO</span>
+        </section>
+
+        <section class="admin-stats">
+            <article class="admin-stat">
+                <span>👥</span>
+                <p>Total Users</p>
+                <h2 id="total-users">0</h2>
+            </article>
+
+            <article class="admin-stat">
+                <span>📅</span>
+                <p>Total Events</p>
+                <h2 id="total-events">0</h2>
+            </article>
+
+            <article class="admin-stat">
+                <span>✅</span>
+                <p>Published Events</p>
+                <h2 id="published-events">0</h2>
+            </article>
+
+            <article class="admin-stat">
+                <span>🏷️</span>
+                <p>Categories</p>
+                <h2 id="total-categories">0</h2>
+            </article>
+        </section>
+
+        <section class="admin-section">
+            <div class="section-heading">
+                <div>
+                    <h2>User Management</h2>
+                    <p class="muted">Review registered demo accounts.</p>
+                </div>
+
+                <input
+                    type="search"
+                    id="user-search"
+                    placeholder="Search users..."
+                    aria-label="Search users"
+                >
+            </div>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>User</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="users-table"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="admin-section">
+            <div class="section-heading">
+                <div>
+                    <h2>Event Management</h2>
+                    <p class="muted">Review and moderate event listings.</p>
+                </div>
+
+                <select id="event-status-filter" aria-label="Filter events">
+                    <option value="ALL">All Events</option>
+                    <option value="PUBLISHED">Published</option>
+                    <option value="DRAFT">Draft</option>
+                    <option value="CANCELLED">Cancelled</option>
+                </select>
+            </div>
+
+            <div id="admin-events" class="admin-events"></div>
+        </section>
+
+        <section class="admin-section">
+            <div class="section-heading">
+                <div>
+                    <h2>Category Management</h2>
+                    <p class="muted">Add and remove event categories.</p>
+                </div>
+            </div>
+
+            <form id="category-form" class="category-form">
+                <input
+                    type="text"
+                    id="category-name"
+                    placeholder="Enter category name"
+                    maxlength="50"
+                    required
+                >
+                <button type="submit" class="primary-button">
+                    + Add Category
+                </button>
+            </form>
+
+            <p id="category-message" class="admin-message" role="status"></p>
+            <div id="category-list" class="category-list"></div>
+        </section>
+
+        <p class="demo-notice">
+            This is a frontend demonstration. No real accounts, permissions,
+            or database records are changed.
+        </p>
+
+    </main>
+
+    <footer class="footer">
+        <p>© 2026 Eventify. Made for unforgettable experiences.</p>
+    </footer>
+
+</body>
+</html>

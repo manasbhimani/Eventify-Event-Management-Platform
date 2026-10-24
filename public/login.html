@@ -1,0 +1,65 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | Eventify</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/auth.css">
+    <script src="js/auth.js" defer></script>
+</head>
+<body class="auth-page">
+
+    <nav class="navbar">
+        <a href="index.html" class="logo">Eventify<span>.</span></a>
+        <div class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="register.html">Create Account</a>
+        </div>
+    </nav>
+
+    <main class="auth-container">
+        <section class="auth-card">
+            <a href="index.html" class="auth-back">← Back to events</a>
+
+            <div class="auth-heading">
+                <span class="auth-icon">✦</span>
+                <h1>Welcome back!</h1>
+                <p>Sign in to continue your Eventify journey.</p>
+            </div>
+
+            <form id="login-form">
+                <label for="login-email">Email address</label>
+                <input
+                    type="email"
+                    id="login-email"
+                    placeholder="you@example.com"
+                    required
+                >
+
+                <label for="login-password">Password</label>
+                <input
+                    type="password"
+                    id="login-password"
+                    placeholder="Enter your password"
+                    minlength="6"
+                    required
+                >
+
+                <button type="submit" class="auth-button">
+                    Sign In →
+                </button>
+
+                <p id="login-message" class="auth-message" role="status"></p>
+            </form>
+
+            <p class="auth-switch">
+                Don't have an account?
+                <a href="register.html">Sign up</a>
+            </p>
+        </section>
+    </main>
+
+</body>
+</html>

@@ -1,0 +1,89 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Account | Eventify</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/auth.css">
+    <script src="js/auth.js" defer></script>
+</head>
+<body class="auth-page">
+
+    <nav class="navbar">
+        <a href="index.html" class="logo">Eventify<span>.</span></a>
+        <div class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="login.html">Login</a>
+        </div>
+    </nav>
+
+    <main class="auth-container">
+        <section class="auth-card">
+            <a href="index.html" class="auth-back">← Back to events</a>
+
+            <div class="auth-heading">
+                <span class="auth-icon">✦</span>
+                <h1>Create your account</h1>
+                <p>Join Eventify and discover something exciting.</p>
+            </div>
+
+            <form id="register-form">
+                <label for="register-name">Full name</label>
+                <input
+                    type="text"
+                    id="register-name"
+                    placeholder="Enter your full name"
+                    minlength="2"
+                    required
+                >
+
+                <label for="register-email">Email address</label>
+                <input
+                    type="email"
+                    id="register-email"
+                    placeholder="you@example.com"
+                    required
+                >
+
+                <label for="register-password">Password</label>
+                <input
+                    type="password"
+                    id="register-password"
+                    placeholder="At least 8 characters"
+                    minlength="8"
+                    required
+                >
+
+                <label for="register-confirm-password">Confirm password</label>
+                <input
+                    type="password"
+                    id="register-confirm-password"
+                    placeholder="Enter password again"
+                    minlength="8"
+                    required
+                >
+
+                <label for="register-role">I want to join as</label>
+                <select id="register-role" required>
+                    <option value="ATTENDEE">Attendee — discover and book events</option>
+                    <option value="ORGANIZER">Organizer — create and manage events</option>
+                </select>
+
+                <button type="submit" class="auth-button">
+                    Create Account →
+                </button>
+
+                <p id="register-message" class="auth-message" role="status"></p>
+            </form>
+
+            <p class="auth-switch">
+                Already have an account?
+                <a href="login.html">Sign in</a>
+            </p>
+        </section>
+    </main>
+
+</body>
+</html>
