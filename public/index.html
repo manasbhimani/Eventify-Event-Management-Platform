@@ -1,0 +1,121 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Discover and book exciting events with Eventify.">
+    <title>Eventify | Discover Your Next Experience</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="js/app.js" defer></script>
+</head>
+<body>
+    <header class="navbar">
+        <a class="logo" href="index.html">eventify<span>.</span></a>
+
+        <nav>
+            <a href="#events">Discover</a>
+            <a href="#categories">Categories</a>
+            <a href="bookings.html">My Bookings</a>
+        </nav>
+
+        <div class="nav-actions">
+            <a class="login-link" href="login.html">Log in</a>
+            <a class="btn btn-primary" href="register.html">Get Started</a>
+        </div>
+    </header>
+
+    <main>
+        <section class="hero">
+            <div class="hero-content">
+                <span class="eyebrow">YOUR NEXT EXPERIENCE STARTS HERE</span>
+                <h1>Find your people.<br>Discover your <span>moment.</span></h1>
+                <p>
+                    From inspiring workshops to unforgettable live events,
+                    discover experiences worth showing up for.
+                </p>
+
+                <form class="search-bar" id="search-form">
+                    <span aria-hidden="true">⌕</span>
+                    <input
+                        type="search"
+                        id="search-input"
+                        placeholder="Search events, workshops, concerts..."
+                        aria-label="Search events"
+                    >
+                    <button class="btn btn-primary" type="submit">Explore</button>
+                </form>
+
+                <div class="hero-stats">
+                    <div><strong>Discover</strong><span>Local experiences</span></div>
+                    <div><strong>Connect</strong><span>With your community</span></div>
+                    <div><strong>Experience</strong><span>Something new</span></div>
+                </div>
+            </div>
+
+            <div class="hero-visual">
+                <div class="hero-image">
+                    <div class="image-caption">
+                        <span>MAKE IT MEMORABLE</span>
+                        <h2>Moments that<br>bring us together.</h2>
+                    </div>
+                </div>
+                <div class="floating-note">
+                    <span class="note-icon">✦</span>
+                    <div>
+                        <strong>Your next story awaits</strong>
+                        <p>Find something inspiring.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="categories section" id="categories">
+            <div class="section-heading">
+                <div>
+                    <span class="eyebrow">EXPLORE YOUR INTERESTS</span>
+                    <h2>What are you into?</h2>
+                </div>
+            </div>
+
+            <div class="category-list">
+                <button class="category active" data-category="All">✦ All events</button>
+                <button class="category" data-category="Technology">⌘ Technology</button>
+                <button class="category" data-category="Music">♫ Music</button>
+                <button class="category" data-category="Workshop">✎ Workshops</button>
+                <button class="category" data-category="Sports">⚽ Sports</button>
+                <button class="category" data-category="Business">◇ Business</button>
+            </div>
+        </section>
+
+        <section class="events section" id="events">
+            <div class="section-heading">
+                <div>
+                    <span class="eyebrow">HANDPICKED FOR YOU</span>
+                    <h2>Explore upcoming events</h2>
+                    <p class="section-description">
+                        Find your next opportunity to learn, connect and celebrate.
+                    </p>
+                </div>
+                <span class="results-count" id="results-count"></span>
+            </div>
+
+            <div class="event-grid" id="event-grid" aria-live="polite"></div>
+        </section>
+
+        <section class="organizer-cta">
+            <div>
+                <span class="eyebrow">HAVE SOMETHING TO SHARE?</span>
+                <h2>Bring your event to life.</h2>
+                <p>Create an event, connect with your audience and manage registrations.</p>
+            </div>
+            <a class="btn btn-light" href="organizer.html">Become an organizer ↗</a>
+        </section>
+    </main>
+
+    <footer>
+        <a class="logo" href="index.html">eventify<span>.</span></a>
+        <p>Discover more. Experience more. © 2026 Eventify.</p>
+    </footer>
+</body>
+</html>
