@@ -1,0 +1,24 @@
+{
+  "name": "eventify-event-management-platform",
+  "version": "1.0.0",
+  "description": "Eventify - Full-Stack Event Management and Ticket Booking Web Application (DBMS Project)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "event-management",
+    "express",
+    "oracle",
+    "dbms"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "oracledb": "^26.0.0"
+  }
+}
