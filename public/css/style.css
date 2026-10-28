@@ -67,18 +67,23 @@ button:focus-visible, a:focus-visible, input:focus-visible {
     color: var(--accent);
 }
 
-.navbar nav, .nav-actions {
+.navbar nav, .navbar .nav-links, .nav-actions {
     display: flex;
     align-items: center;
     gap: 26px;
 }
 
-.navbar nav a, .login-link {
+.navbar nav a, .navbar .nav-links a, .login-link {
     color: var(--muted);
     font-size: 14px;
 }
 
-.navbar nav a:hover, .login-link:hover {
+.navbar nav a.active, .navbar .nav-links a.active {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.navbar nav a:hover, .navbar .nav-links a:hover, .login-link:hover {
     color: white;
 }
 
@@ -440,7 +445,7 @@ footer p {
         flex-wrap: wrap;
     }
 
-    .navbar nav {
+    .navbar nav, .navbar .nav-links {
         gap: 14px;
     }
 
@@ -466,13 +471,13 @@ footer p {
         padding: 16px 5%;
     }
 
-    .navbar nav {
+    .navbar nav, .navbar .nav-links {
         order: 3;
         width: 100%;
         justify-content: space-between;
     }
 
-    .navbar nav a {
+    .navbar nav a, .navbar .nav-links a {
         font-size: 12px;
     }
 
