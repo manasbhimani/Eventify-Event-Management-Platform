@@ -256,7 +256,7 @@
 
         const noteP = document.createElement("p");
         noteP.className = "booking-note";
-        noteP.textContent = "Demo only — tickets are not reserved yet.";
+        noteP.textContent = "Instant confirmation — view anytime in My Bookings.";
 
         const messageP = document.createElement("p");
         messageP.className = "booking-message";
@@ -289,12 +289,65 @@
             totalStrong.textContent = total === 0 ? "Free" : `₹${total}`;
         });
 
-        form.addEventListener("submit", function (e) {
+        let isSubmitting = false;
+
+        form.addEventListener("submit", async function (e) {
             e.preventDefault();
-            const qty = Number(qtySelect.value) || 1;
-            const total = priceNum * qty;
-            messageP.textContent = `Demo selection: ${qty} ticket(s), total ${total === 0 ? "Free" : "₹" + total}. ` +
-                "No booking has been created. Booking integration is coming in Phase 4.";
+            if (isSubmitting) return;
+
+            const qty = Number(qtySelect.value);
+            if (!Number.isInteger(qty) || qty < 1) {
+                messageP.textContent = "Please select a valid ticket quantity (at least 1).";
+                messageP.className = "booking-message error";
+                return;
+            }
+
+            isSubmitting = true;
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Reserving tickets...";
+            messageP.textContent = "Connecting to server...";
+            messageP.className = "booking-message";
+
+            try {
+                const response = await window.api.createBooking(event.id, qty);
+
+                if (response && response.success && response.data) {
+                    const booking = response.data;
+                    messageP.className = "booking-message success";
+                    messageP.innerHTML = "";
+
+                    const successText = document.createElement("span");
+                    const ticketsText = `${booking.quantity} ticket${booking.quantity === 1 ? "" : "s"}`;
+                    const costText = booking.amount === 0 ? "Free" : `₹${Number(booking.amount).toLocaleString("en-IN")}`;
+                    successText.textContent = `✓ Booking confirmed! Reference ID: ${booking.id} (${ticketsText}, ${costText}).`;
+
+                    const viewLink = document.createElement("a");
+                    viewLink.href = "bookings.html";
+                    viewLink.textContent = "View in My Bookings →";
+                    viewLink.style.display = "block";
+                    viewLink.style.marginTop = "6px";
+                    viewLink.style.color = "#86efac";
+                    viewLink.style.fontWeight = "600";
+                    viewLink.style.textDecoration = "underline";
+
+                    messageP.appendChild(successText);
+                    messageP.appendChild(viewLink);
+
+                    noteP.textContent = `Reservation recorded for ${event.title}.`;
+                    submitBtn.textContent = "Book More Tickets";
+                    submitBtn.disabled = false;
+                } else {
+                    throw new Error((response && response.message) || "Booking confirmation failed.");
+                }
+            } catch (err) {
+                console.error("[Booking] Creation failed:", err);
+                messageP.className = "booking-message error";
+                messageP.textContent = err.message || "Unable to reserve tickets. Please try again.";
+                submitBtn.disabled = false;
+                submitBtn.textContent = "Continue to booking";
+            } finally {
+                isSubmitting = false;
+            }
         });
     }
 
