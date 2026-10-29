@@ -1,227 +1,331 @@
+/**
+ * public/js/event.js
+ *
+ * Eventify — Event Details Controller
+ *
+ * Reads event ID from URL query parameters, loads event data via window.api,
+ * and renders details safely using DOM APIs.
+ */
 
-const sampleEvents = [
-    {
-        id: 1,
-        title: "Future of Technology Summit",
-        category: "Technology",
-        date: "2027-01-15",
-        city: "Surat",
-        venue: "Innovation Hall",
-        price: 199,
-        capacity: 100,
-        description:
-            "Explore emerging technologies, meet fellow technology enthusiasts, and discover new ideas through talks and discussions. This sample event is designed for students, developers, and innovators.",
-        image: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1400&q=85"
-    },
-    {
-        id: 2,
-        title: "Live Music Night",
-        category: "Music",
-        date: "2027-01-22",
-        city: "Ahmedabad",
-        venue: "City Auditorium",
-        price: 499,
-        capacity: 200,
-        description:
-            "Enjoy an evening of live performances, music, and community. Discover local talent and share a memorable night with fellow music lovers.",
-        image: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=1400&q=85"
-    },
-    {
-        id: 3,
-        title: "Creative Design Workshop",
-        category: "Workshop",
-        date: "2027-02-05",
-        city: "Surat",
-        venue: "Creative Studio",
-        price: 299,
-        capacity: 50,
-        description:
-            "Learn creative problem-solving, explore design fundamentals, and practise turning ideas into useful digital experiences.",
-        image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1400&q=85"
-    },
-    {
-        id: 4,
-        title: "Startup Networking Meetup",
-        category: "Business",
-        date: "2027-02-12",
-        city: "Vadodara",
-        venue: "Business Hub",
-        price: 0,
-        capacity: 80,
-        description:
-            "Connect with students, entrepreneurs, and professionals. Share ideas, learn from other founders, and explore collaboration opportunities.",
-        image: "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=1400&q=85"
-    },
-    {
-        id: 5,
-        title: "Community Sports Day",
-        category: "Sports",
-        date: "2027-02-20",
-        city: "Surat",
-        venue: "Sports Complex",
-        price: 149,
-        capacity: 100,
-        description:
-            "Take part in a fun community sports event featuring friendly competition, teamwork, and activities for sports enthusiasts.",
-        image: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=1400&q=85"
-    },
-    {
-        id: 6,
-        title: "Web Development Bootcamp",
-        category: "Technology",
-        date: "2027-03-06",
-        city: "Ahmedabad",
-        venue: "Learning Centre",
-        price: 399,
-        capacity: 60,
-        description:
-            "Explore the fundamentals of web development and learn how HTML, CSS, and JavaScript work together to create websites.",
-        image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1400&q=85"
-    }
-];
+(function () {
+    "use strict";
 
-const eventId = Number(
-    new URLSearchParams(window.location.search).get("id")
-);
+    const eventContent = document.getElementById("event-content");
+    const urlParams = new URLSearchParams(window.location.search);
+    const rawId = urlParams.get("id");
 
-const selectedEvent = sampleEvents.find(
-    event => event.id === eventId
-);
-
-const eventContent = document.getElementById("event-content");
-
-function formatEventDate(dateString) {
-    return new Date(dateString + "T12:00:00").toLocaleDateString(
-        "en-IN",
-        {
-            weekday: "long",
-            day: "numeric",
-            month: "long",
-            year: "numeric"
+    /**
+     * Format a date string into human-friendly long format (e.g., "Saturday, 15 January 2027").
+     * @param {string} dateString
+     * @returns {string}
+     */
+    function formatEventDate(dateString) {
+        if (!dateString) return "Date TBA";
+        try {
+            const dateVal = dateString.includes("T") ? dateString : `${dateString}T12:00:00`;
+            const d = new Date(dateVal);
+            if (isNaN(d.getTime())) return dateString;
+            return d.toLocaleDateString("en-IN", {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+                year: "numeric"
+            });
+        } catch (_) {
+            return dateString;
         }
-    );
-}
-
-function showNotFound() {
-    eventContent.innerHTML = `
-        <div class="error-state">
-            <h2>Event not found</h2>
-            <p>This event does not exist in our sample event list.</p>
-            <a class="btn btn-primary" href="index.html#events">
-                Browse events
-            </a>
-        </div>
-    `;
-}
-
-function renderEvent(event) {
-    document.title = `${event.title} | Eventify`;
-
-    eventContent.innerHTML = `
-        <section class="event-banner"
-            style="background-image: url('${event.image}')">
-            <div class="event-banner-content">
-                <span class="eyebrow">${event.category.toUpperCase()}</span>
-                <h1>${event.title}</h1>
-                <p>${formatEventDate(event.date)} · ${event.city}</p>
-            </div>
-        </section>
-
-        <div class="event-layout">
-            <section class="event-main">
-                <div class="event-facts">
-                    <div class="event-fact">
-                        <span>Date</span>
-                        <strong>${formatEventDate(event.date)}</strong>
-                    </div>
-                    <div class="event-fact">
-                        <span>Location</span>
-                        <strong>${event.venue}, ${event.city}</strong>
-                    </div>
-                    <div class="event-fact">
-                        <span>Category</span>
-                        <strong>${event.category}</strong>
-                    </div>
-                    <div class="event-fact">
-                        <span>Listed capacity</span>
-                        <strong>${event.capacity} tickets</strong>
-                    </div>
-                </div>
-
-                <h2>About this event</h2>
-                <p>${event.description}</p>
-            </section>
-
-            <aside class="booking-card">
-                <p class="eyebrow">YOUR NEXT EXPERIENCE</p>
-                <p class="price">
-                    ${event.price === 0 ? "Free" : "₹" + event.price}
-                </p>
-                <p class="muted">Price per ticket</p>
-
-                <form id="booking-form">
-                    <label for="ticket-quantity">Number of tickets</label>
-                    <select id="ticket-quantity" name="quantity">
-                        ${Array.from(
-                            { length: Math.min(5, event.capacity) },
-                            (_, index) => `
-                                <option value="${index + 1}">
-                                    ${index + 1} ticket${index === 0 ? "" : "s"}
-                                </option>
-                            `
-                        ).join("")}
-                    </select>
-
-                    <div class="booking-total">
-                        <span>Total</span>
-                        <strong id="booking-total">
-                            ${event.price === 0 ? "Free" : "₹" + event.price}
-                        </strong>
-                    </div>
-
-                    <button class="btn btn-primary" type="submit">
-                        Continue to booking
-                    </button>
-
-                    <p class="booking-note">
-                        Demo only — tickets are not reserved yet.
-                    </p>
-                    <p class="booking-message" id="booking-message"
-                       role="status" aria-live="polite"></p>
-                </form>
-            </aside>
-        </div>
-    `;
-
-    const quantityInput = document.getElementById("ticket-quantity");
-    const totalDisplay = document.getElementById("booking-total");
-    const bookingForm = document.getElementById("booking-form");
-    const message = document.getElementById("booking-message");
-
-    function updateTotal() {
-        const quantity = Number(quantityInput.value);
-        const total = event.price * quantity;
-
-        totalDisplay.textContent =
-            total === 0 ? "Free" : "₹" + total;
     }
 
-    quantityInput.addEventListener("change", updateTotal);
+    /**
+     * Sanitize image URLs to prevent javascript: or malformed CSS injection.
+     * @param {string} url
+     * @returns {string} Safe URL or fallback placeholder
+     */
+    function sanitizeImageUrl(url) {
+        if (!url || typeof url !== "string") return "";
+        const trimmed = url.trim();
+        if (/^(https?:\/\/|\/|\.\/)/i.test(trimmed)) {
+            return trimmed.replace(/['"()]/g, "");
+        }
+        return "";
+    }
 
-    bookingForm.addEventListener("submit", function (e) {
-        e.preventDefault();
+    /**
+     * Display a loading indicator.
+     */
+    function showLoading() {
+        if (!eventContent) return;
+        eventContent.innerHTML = "";
 
-        const quantity = Number(quantityInput.value);
-        const total = event.price * quantity;
+        const p = document.createElement("p");
+        p.className = "loading-message";
+        p.textContent = "Loading event details...";
+        eventContent.appendChild(p);
+    }
 
-        message.textContent =
-            `Demo selection: ${quantity} ticket(s), total ₹${total}. ` +
-            "No booking has been created. Backend integration is coming next.";
-    });
-}
+    /**
+     * Display an error or not-found state with appropriate navigation options.
+     * @param {string} title
+     * @param {string} message
+     * @param {boolean} allowRetry
+     */
+    function showError(title, message, allowRetry = false) {
+        if (!eventContent) return;
+        eventContent.innerHTML = "";
 
-if (selectedEvent) {
-    renderEvent(selectedEvent);
-} else {
-    showNotFound();
-}
+        const box = document.createElement("div");
+        box.className = "error-state";
+
+        const h2 = document.createElement("h2");
+        h2.textContent = title;
+
+        const p = document.createElement("p");
+        p.textContent = message;
+
+        box.appendChild(h2);
+        box.appendChild(p);
+
+        if (allowRetry) {
+            const retryBtn = document.createElement("button");
+            retryBtn.className = "btn btn-primary";
+            retryBtn.type = "button";
+            retryBtn.textContent = "Retry";
+            retryBtn.style.marginRight = "12px";
+            retryBtn.addEventListener("click", () => {
+                loadEvent();
+            });
+            box.appendChild(retryBtn);
+        }
+
+        const backLink = document.createElement("a");
+        backLink.className = allowRetry ? "btn" : "btn btn-primary";
+        backLink.href = "index.html#events";
+        backLink.textContent = "← Browse all events";
+        if (allowRetry) {
+            backLink.style.backgroundColor = "var(--surface-light)";
+            backLink.style.color = "var(--text)";
+            backLink.style.border = "1px solid var(--border)";
+        }
+        box.appendChild(backLink);
+
+        eventContent.appendChild(box);
+    }
+
+    /**
+     * Helper to create a single fact block in the facts grid.
+     * @param {string} labelText
+     * @param {string} valueText
+     * @returns {HTMLElement}
+     */
+    function createFactItem(labelText, valueText) {
+        const item = document.createElement("div");
+        item.className = "event-fact";
+
+        const label = document.createElement("span");
+        label.textContent = labelText;
+
+        const value = document.createElement("strong");
+        value.textContent = valueText;
+
+        item.appendChild(label);
+        item.appendChild(value);
+        return item;
+    }
+
+    /**
+     * Render the loaded event onto the page safely using DOM elements.
+     * @param {Object} event
+     */
+    function renderEvent(event) {
+        document.title = `${event.title || "Event Details"} | Eventify`;
+
+        eventContent.innerHTML = "";
+
+        // 1. Banner section
+        const banner = document.createElement("section");
+        banner.className = "event-banner";
+        const safeImage = sanitizeImageUrl(event.image);
+        if (safeImage) {
+            banner.style.backgroundImage = `url('${safeImage}')`;
+        }
+
+        const bannerContent = document.createElement("div");
+        bannerContent.className = "event-banner-content";
+
+        const eyebrow = document.createElement("span");
+        eyebrow.className = "eyebrow";
+        eyebrow.textContent = (event.category || "General").toUpperCase();
+
+        const title = document.createElement("h1");
+        title.textContent = event.title || "Untitled Event";
+
+        const dateCity = document.createElement("p");
+        dateCity.textContent = `${formatEventDate(event.date)} · ${event.city || ""}`;
+
+        bannerContent.appendChild(eyebrow);
+        bannerContent.appendChild(title);
+        bannerContent.appendChild(dateCity);
+        banner.appendChild(bannerContent);
+
+        // 2. Main layout grid
+        const layout = document.createElement("div");
+        layout.className = "event-layout";
+
+        // 2a. Event main details
+        const main = document.createElement("section");
+        main.className = "event-main";
+
+        const facts = document.createElement("div");
+        facts.className = "event-facts";
+
+        const venueCityText = event.venue && event.city
+            ? `${event.venue}, ${event.city}`
+            : event.venue || event.city || "TBA";
+
+        const capacityNum = Number(event.capacity) || 0;
+
+        facts.appendChild(createFactItem("Date", formatEventDate(event.date)));
+        facts.appendChild(createFactItem("Location", venueCityText));
+        facts.appendChild(createFactItem("Category", event.category || "General"));
+        facts.appendChild(createFactItem("Listed capacity", `${capacityNum} tickets`));
+
+        const aboutHeading = document.createElement("h2");
+        aboutHeading.textContent = "About this event";
+
+        const description = document.createElement("p");
+        description.textContent = event.description || "No description provided.";
+
+        main.appendChild(facts);
+        main.appendChild(aboutHeading);
+        main.appendChild(description);
+
+        // 2b. Booking card aside
+        const aside = document.createElement("aside");
+        aside.className = "booking-card";
+
+        const bookingEyebrow = document.createElement("p");
+        bookingEyebrow.className = "eyebrow";
+        bookingEyebrow.textContent = "YOUR NEXT EXPERIENCE";
+
+        const priceP = document.createElement("p");
+        priceP.className = "price";
+        const priceNum = Number(event.price) || 0;
+        priceP.textContent = priceNum === 0 ? "Free" : `₹${priceNum}`;
+
+        const priceMuted = document.createElement("p");
+        priceMuted.className = "muted";
+        priceMuted.textContent = "Price per ticket";
+
+        // Booking form
+        const form = document.createElement("form");
+        form.id = "booking-form";
+
+        const qtyLabel = document.createElement("label");
+        qtyLabel.htmlFor = "ticket-quantity";
+        qtyLabel.textContent = "Number of tickets";
+
+        const qtySelect = document.createElement("select");
+        qtySelect.id = "ticket-quantity";
+        qtySelect.name = "quantity";
+
+        const maxTickets = Math.min(5, Math.max(1, capacityNum));
+        for (let i = 1; i <= maxTickets; i++) {
+            const opt = document.createElement("option");
+            opt.value = String(i);
+            opt.textContent = `${i} ticket${i === 1 ? "" : "s"}`;
+            qtySelect.appendChild(opt);
+        }
+
+        const totalDiv = document.createElement("div");
+        totalDiv.className = "booking-total";
+
+        const totalSpan = document.createElement("span");
+        totalSpan.textContent = "Total";
+
+        const totalStrong = document.createElement("strong");
+        totalStrong.id = "booking-total";
+        totalStrong.textContent = priceNum === 0 ? "Free" : `₹${priceNum}`;
+
+        totalDiv.appendChild(totalSpan);
+        totalDiv.appendChild(totalStrong);
+
+        const submitBtn = document.createElement("button");
+        submitBtn.className = "btn btn-primary";
+        submitBtn.type = "submit";
+        submitBtn.textContent = "Continue to booking";
+
+        const noteP = document.createElement("p");
+        noteP.className = "booking-note";
+        noteP.textContent = "Demo only — tickets are not reserved yet.";
+
+        const messageP = document.createElement("p");
+        messageP.className = "booking-message";
+        messageP.id = "booking-message";
+        messageP.setAttribute("role", "status");
+        messageP.setAttribute("aria-live", "polite");
+
+        form.appendChild(qtyLabel);
+        form.appendChild(qtySelect);
+        form.appendChild(totalDiv);
+        form.appendChild(submitBtn);
+        form.appendChild(noteP);
+        form.appendChild(messageP);
+
+        aside.appendChild(bookingEyebrow);
+        aside.appendChild(priceP);
+        aside.appendChild(priceMuted);
+        aside.appendChild(form);
+
+        layout.appendChild(main);
+        layout.appendChild(aside);
+
+        eventContent.appendChild(banner);
+        eventContent.appendChild(layout);
+
+        // --- Interactive Form Handlers ---
+        qtySelect.addEventListener("change", function () {
+            const qty = Number(qtySelect.value) || 1;
+            const total = priceNum * qty;
+            totalStrong.textContent = total === 0 ? "Free" : `₹${total}`;
+        });
+
+        form.addEventListener("submit", function (e) {
+            e.preventDefault();
+            const qty = Number(qtySelect.value) || 1;
+            const total = priceNum * qty;
+            messageP.textContent = `Demo selection: ${qty} ticket(s), total ${total === 0 ? "Free" : "₹" + total}. ` +
+                "No booking has been created. Booking integration is coming in Phase 4.";
+        });
+    }
+
+    /**
+     * Load event details from GET /api/events/:id.
+     */
+    async function loadEvent() {
+        if (!rawId || isNaN(Number(rawId)) || Number(rawId) <= 0) {
+            showError("Invalid Event ID", "No valid event ID was provided. Please choose an event from the catalog.", false);
+            return;
+        }
+
+        showLoading();
+
+        try {
+            const response = await window.api.getEventById(rawId);
+            if (response && response.data) {
+                renderEvent(response.data);
+            } else {
+                showError("Event Not Found", "The requested event could not be found.", false);
+            }
+        } catch (err) {
+            console.error("[Event Details] Failed to load event:", err);
+            if (err.status === 404) {
+                showError("Event Not Found", "This event does not exist in our catalog or has been removed.", false);
+            } else {
+                showError("Unable to Load Event", err.message || "Failed to connect to the server.", true);
+            }
+        }
+    }
+
+    // --- Initialize ---
+    loadEvent();
+})();
