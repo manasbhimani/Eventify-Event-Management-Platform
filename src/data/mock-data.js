@@ -103,9 +103,46 @@ const seedCategories = [
     { id: 6, name: "Conference" }
 ];
 
+/**
+ * Seed users for development and testing.
+ * Passwords are pre-hashed using bcryptjs (cost factor 10).
+ *
+ * Seed Credentials:
+ *   - Admin:     admin@eventify.local     / Admin@123
+ *   - Organizer: organizer@eventify.local / Organizer@123
+ *   - Attendee:  attendee@eventify.local  / Attendee@123
+ */
+const seedUsers = [
+    {
+        id: 1,
+        name: "Admin User",
+        email: "admin@eventify.local",
+        passwordHash: "$2b$10$TQ3ECbwai/jhO2ml1JpoFe6bRiboFDZwOY/MCqWjo3QYFZ1OAvjZK",
+        role: "ADMIN",
+        createdAt: "2026-10-01T09:00:00.000Z"
+    },
+    {
+        id: 2,
+        name: "Event Organizer",
+        email: "organizer@eventify.local",
+        passwordHash: "$2b$10$9xShOR93vLsNZ/z6zp8UWuuDCcRe8zfKSfA5vGPaVopQS4HcFVXsS",
+        role: "ORGANIZER",
+        createdAt: "2026-10-05T10:30:00.000Z"
+    },
+    {
+        id: 3,
+        name: "Alex Attendee",
+        email: "attendee@eventify.local",
+        passwordHash: "$2b$10$orMrAVvVnKeornFI0qfASe1fs5Fgq4pG4v5ocgGC174vpGBuLhgra",
+        role: "ATTENDEE",
+        createdAt: "2026-10-10T14:15:00.000Z"
+    }
+];
+
 const seedBookings = [
     {
         id: "EVT-1001",
+        userId: 3,
         eventId: 1,
         title: "Future of Technology Summit",
         date: "2027-01-15T10:00:00",
@@ -117,6 +154,7 @@ const seedBookings = [
     },
     {
         id: "EVT-1002",
+        userId: 3,
         eventId: 3,
         title: "Creative Design Workshop",
         date: "2027-02-10T11:00:00",
@@ -128,4 +166,4 @@ const seedBookings = [
     }
 ];
 
-module.exports = { seedEvents, seedCategories, seedBookings };
+module.exports = { seedEvents, seedCategories, seedBookings, seedUsers };

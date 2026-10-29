@@ -1,21 +1,25 @@
 /**
  * src/routes/events.routes.js
  *
- * GET  /api/events          — List events with optional filtering.
- * GET  /api/events/:id      — Get one event by ID.
- * POST /api/events          — Create a new event (demo — no auth required yet).
+ * Eventify — Events API routes.
+ *
+ * Endpoints:
+ *   GET  /api/events     — List events with optional category/search filters (public).
+ *   GET  /api/events/:id — Get details of a single event by ID (public).
+ *   POST /api/events     — Create a new event (ORGANIZER or ADMIN role required).
  */
 
 "use strict";
 
 const express = require("express");
 const store   = require("../data/store");
+const { requireRole, csrfProtection } = require("../middleware/auth.middleware");
 
 const router = express.Router();
 
 // ---------------------------------------------------------------------------
 // GET /api/events
-// Query params: category (string), search (string)
+// Query params: category (string), search (string) — Public
 // ---------------------------------------------------------------------------
 router.get("/", (req, res) => {
     const { category, search } = req.query;
@@ -30,6 +34,7 @@ router.get("/", (req, res) => {
 
 // ---------------------------------------------------------------------------
 // GET /api/events/:id
+// Public
 // ---------------------------------------------------------------------------
 router.get("/:id", (req, res) => {
     const eventId = parseInt(req.params.id, 10);
@@ -60,8 +65,9 @@ router.get("/:id", (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/events
 // Required body fields: title, category, date
+// Protected: ORGANIZER or ADMIN role required + CSRF protection.
 // ---------------------------------------------------------------------------
-router.post("/", (req, res) => {
+router.post("/", requireRole("ORGANIZER", "ADMIN"), csrfProtection, (req, res) => {
     const { title, category, date, city, venue, price, capacity, description } = req.body;
 
     if (!title || !category || !date) {
@@ -71,7 +77,17 @@ router.post("/", (req, res) => {
         });
     }
 
-    const newEvent = store.createEvent({ title, category, date, city, venue, price, capacity, description });
+    const newEvent = store.createEvent({
+        title,
+        category,
+        date,
+        city,
+        venue,
+        price,
+        capacity,
+        description,
+        creatorId: req.user.id
+    });
 
     res.status(201).json({
         success: true,

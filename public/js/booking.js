@@ -240,29 +240,38 @@
      * Show error state with a retry action when fetching bookings fails.
      * @param {string} message
      */
-    function showError(message) {
+    function showError(message, isAuthError = false) {
         if (!bookingsList) return;
         bookingsList.innerHTML = "";
         const box = document.createElement("div");
         box.className = "empty-bookings";
 
         const h3 = document.createElement("h3");
-        h3.textContent = "Unable to load bookings";
+        h3.textContent = isAuthError ? "Sign In Required" : "Unable to load bookings";
 
         const p = document.createElement("p");
         p.textContent = message || "Failed to connect to the server. Please check your connection.";
 
-        const retryBtn = document.createElement("button");
-        retryBtn.type = "button";
-        retryBtn.className = "explore-button";
-        retryBtn.textContent = "Retry";
-        retryBtn.addEventListener("click", () => {
-            loadBookings();
-        });
-
-        box.appendChild(h3);
-        box.appendChild(p);
-        box.appendChild(retryBtn);
+        if (isAuthError) {
+            const loginBtn = document.createElement("a");
+            loginBtn.href = "login.html?redirect=bookings.html";
+            loginBtn.className = "explore-button";
+            loginBtn.textContent = "Log In to View Bookings";
+            box.appendChild(h3);
+            box.appendChild(p);
+            box.appendChild(loginBtn);
+        } else {
+            const retryBtn = document.createElement("button");
+            retryBtn.type = "button";
+            retryBtn.className = "explore-button";
+            retryBtn.textContent = "Retry";
+            retryBtn.addEventListener("click", () => {
+                loadBookings();
+            });
+            box.appendChild(h3);
+            box.appendChild(p);
+            box.appendChild(retryBtn);
+        }
         bookingsList.appendChild(box);
     }
 
@@ -324,7 +333,8 @@
             renderBookings();
         } catch (err) {
             console.error("[Bookings] Failed to load:", err);
-            showError(err.message);
+            const isAuth = err.status === 401;
+            showError(isAuth ? "Please log in to view and manage your event reservations." : err.message, isAuth);
         }
     }
 

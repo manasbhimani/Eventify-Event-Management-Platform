@@ -4,14 +4,24 @@
  * Eventify — Frontend API Client Helper
  *
  * A lightweight, vanilla JavaScript helper for making fetch requests to the
- * same-origin /api endpoints. Handles network errors, HTTP error status codes,
- * and JSON parsing errors consistently without external libraries.
+ * same-origin /api endpoints. Handles credentials, CSRF headers, HTTP errors,
+ * network failures, and JSON parsing consistently without external dependencies.
  */
 
 (function () {
     "use strict";
 
     const BASE_URL = "/api";
+
+    /**
+     * Read the CSRF token from the non-HttpOnly cookie set by the server.
+     * @returns {string|null}
+     */
+    function getCsrfToken() {
+        if (typeof document === "undefined") return null;
+        const match = document.cookie.match(/(?:^|;\s*)eventify_csrf=([^;]+)/);
+        return match ? decodeURIComponent(match[1]) : null;
+    }
 
     /**
      * Perform an HTTP request to the Eventify backend API.
@@ -23,14 +33,40 @@
         const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
         const url = `${BASE_URL}${cleanEndpoint}`;
 
+        const method = (options.method || "GET").toUpperCase();
+        const headers = {
+            Accept: "application/json",
+            ...(options.body ? { "Content-Type": "application/json" } : {}),
+            ...(options.headers || {})
+        };
+
+        // Attach CSRF token on state-changing requests if present
+        if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
+            let csrfToken = getCsrfToken();
+            if (!csrfToken) {
+                try {
+                    const csrfRes = await fetch(`${BASE_URL}/auth/csrf`, {
+                        credentials: "same-origin",
+                        headers: { Accept: "application/json" }
+                    });
+                    const csrfData = await csrfRes.json();
+                    if (csrfData && csrfData.csrfToken) {
+                        csrfToken = csrfData.csrfToken;
+                    }
+                } catch (_) {
+                    // Ignore, will be caught by request error handling
+                }
+            }
+            if (csrfToken && !headers["X-CSRF-Token"]) {
+                headers["X-CSRF-Token"] = csrfToken;
+            }
+        }
+
         let response;
         try {
             response = await fetch(url, {
-                headers: {
-                    Accept: "application/json",
-                    ...(options.body ? { "Content-Type": "application/json" } : {}),
-                    ...(options.headers || {})
-                },
+                credentials: "same-origin",
+                headers,
                 ...options
             });
         } catch (networkError) {
@@ -77,11 +113,66 @@
      * Eventify API methods
      */
     const api = {
+        // --- AUTHENTICATION & IDENTITY ---
+
+        /**
+         * Log in with email and password.
+         * @param {string} email
+         * @param {string} password
+         * @returns {Promise<{success: boolean, message: string, user: Object, csrfToken: string}>}
+         */
+        login(email, password) {
+            return request("/auth/login", {
+                method: "POST",
+                body: JSON.stringify({ email, password })
+            });
+        },
+
+        /**
+         * Register a new ATTENDEE account.
+         * @param {string} name
+         * @param {string} email
+         * @param {string} password
+         * @returns {Promise<{success: boolean, message: string, user: Object, csrfToken: string}>}
+         */
+        register(name, email, password) {
+            return request("/auth/register", {
+                method: "POST",
+                body: JSON.stringify({ name, email, password })
+            });
+        },
+
+        /**
+         * Log out current session and invalidate cookies.
+         * @returns {Promise<{success: boolean, message: string}>}
+         */
+        logout() {
+            return request("/auth/logout", {
+                method: "POST"
+            });
+        },
+
+        /**
+         * Get the currently authenticated user's details.
+         * @returns {Promise<{success: boolean, user: Object, csrfToken: string}>}
+         */
+        getMe() {
+            return request("/auth/me");
+        },
+
+        /**
+         * Retrieve active CSRF token.
+         * @returns {string|null}
+         */
+        getCsrfToken,
+
+        // --- EVENTS ---
+
         /**
          * Fetch all events, optionally filtered by category and/or search query.
          * @param {Object} [params]
-         * @param {string} [params.category] - Category name filter
-         * @param {string} [params.search] - Search keyword
+         * @param {string} [params.category]
+         * @param {string} [params.search]
          * @returns {Promise<{success: boolean, count: number, data: Array}>}
          */
         getEvents(params = {}) {
@@ -98,12 +189,26 @@
 
         /**
          * Fetch a single event by numeric ID.
-         * @param {number|string} id - Event ID
+         * @param {number|string} id
          * @returns {Promise<{success: boolean, data: Object}>}
          */
         getEventById(id) {
             return request(`/events/${encodeURIComponent(id)}`);
         },
+
+        /**
+         * Create a new event (ORGANIZER or ADMIN).
+         * @param {Object} eventData
+         * @returns {Promise<{success: boolean, message: string, data: Object}>}
+         */
+        createEvent(eventData) {
+            return request("/events", {
+                method: "POST",
+                body: JSON.stringify(eventData)
+            });
+        },
+
+        // --- CATEGORIES ---
 
         /**
          * Fetch all categories.
@@ -113,8 +218,10 @@
             return request("/categories");
         },
 
+        // --- BOOKINGS ---
+
         /**
-         * Fetch all bookings.
+         * Fetch bookings (caller's own bookings; ADMIN sees all).
          * @returns {Promise<{success: boolean, count: number, data: Array}>}
          */
         getBookings() {
@@ -143,6 +250,16 @@
             return request(`/bookings/${encodeURIComponent(bookingId)}/cancel`, {
                 method: "POST"
             });
+        },
+
+        // --- ADMIN ---
+
+        /**
+         * Fetch platform statistics (ADMIN only).
+         * @returns {Promise<{success: boolean, stats: Object}>}
+         */
+        getAdminStats() {
+            return request("/admin/stats");
         },
 
         request

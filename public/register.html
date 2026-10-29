@@ -6,6 +6,8 @@
     <title>Create Account | Eventify</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/auth.css">
+    <script src="js/api.js" defer></script>
+    <script src="js/nav.js" defer></script>
     <script src="js/auth.js" defer></script>
 </head>
 <body class="auth-page">
@@ -64,10 +66,9 @@
                     required
                 >
 
-                <label for="register-role">I want to join as</label>
-                <select id="register-role" required>
-                    <option value="ATTENDEE">Attendee — discover and book events</option>
-                    <option value="ORGANIZER">Organizer — create and manage events</option>
+                <label for="register-role">Account type</label>
+                <select id="register-role" disabled>
+                    <option value="ATTENDEE" selected>Attendee — discover and book events</option>
                 </select>
 
                 <button type="submit" class="auth-button">

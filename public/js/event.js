@@ -342,7 +342,21 @@
             } catch (err) {
                 console.error("[Booking] Creation failed:", err);
                 messageP.className = "booking-message error";
-                messageP.textContent = err.message || "Unable to reserve tickets. Please try again.";
+                if (err.status === 401) {
+                    messageP.innerHTML = "";
+                    const authText = document.createElement("span");
+                    authText.textContent = "Please sign in to reserve your tickets. ";
+                    const loginLink = document.createElement("a");
+                    loginLink.href = `login.html?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+                    loginLink.textContent = "Sign In Now →";
+                    loginLink.style.color = "#a78bfa";
+                    loginLink.style.fontWeight = "600";
+                    loginLink.style.textDecoration = "underline";
+                    messageP.appendChild(authText);
+                    messageP.appendChild(loginLink);
+                } else {
+                    messageP.textContent = err.message || "Unable to reserve tickets. Please try again.";
+                }
                 submitBtn.disabled = false;
                 submitBtn.textContent = "Continue to booking";
             } finally {
