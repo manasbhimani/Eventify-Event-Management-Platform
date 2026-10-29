@@ -113,6 +113,38 @@
             return request("/categories");
         },
 
+        /**
+         * Fetch all bookings.
+         * @returns {Promise<{success: boolean, count: number, data: Array}>}
+         */
+        getBookings() {
+            return request("/bookings");
+        },
+
+        /**
+         * Create a new ticket booking for an event.
+         * @param {number|string} eventId
+         * @param {number} quantity
+         * @returns {Promise<{success: boolean, message: string, data: Object}>}
+         */
+        createBooking(eventId, quantity) {
+            return request("/bookings", {
+                method: "POST",
+                body: JSON.stringify({ eventId: Number(eventId), quantity: Number(quantity) })
+            });
+        },
+
+        /**
+         * Cancel an existing booking by reference ID.
+         * @param {string} bookingId
+         * @returns {Promise<{success: boolean, message: string, data: Object}>}
+         */
+        cancelBooking(bookingId) {
+            return request(`/bookings/${encodeURIComponent(bookingId)}/cancel`, {
+                method: "POST"
+            });
+        },
+
         request
     };
 

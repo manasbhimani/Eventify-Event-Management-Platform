@@ -224,6 +224,11 @@
     border-color: #713b4a;
 }
 
+.cancel-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .empty-bookings {
     padding: 45px 20px;
     text-align: center;

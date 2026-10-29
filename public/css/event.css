@@ -177,6 +177,14 @@
     font-size: 13px;
 }
 
+.booking-message.success {
+    color: #86efac;
+}
+
+.booking-message.error {
+    color: #fca5a5;
+}
+
 .loading-message, .error-state {
     padding: 50px 15px;
     color: var(--muted);
