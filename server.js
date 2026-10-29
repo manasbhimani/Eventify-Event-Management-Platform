@@ -35,6 +35,11 @@ const bookingsRouter   = require("./src/routes/bookings.routes");
 const adminRouter      = require("./src/routes/admin.routes");
 
 // ---------------------------------------------------------------------------
+// Auth / Session middleware
+// ---------------------------------------------------------------------------
+const { cookieParserMiddleware, sessionMiddleware } = require("./src/middleware/auth.middleware");
+
+// ---------------------------------------------------------------------------
 // Error / fallback middleware
 // ---------------------------------------------------------------------------
 const { notFoundApiHandler, globalErrorHandler } = require("./src/middleware/error.middleware");
@@ -46,9 +51,35 @@ const app  = express();
 const PORT = process.env.PORT || 3000;
 
 // ---------- Core middleware ----------
-app.use(cors());
+const isProduction = process.env.NODE_ENV === "production";
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(",").map(s => s.trim())
+    : null;
+
+app.use(cors({
+    origin: function (origin, callback) {
+        if (!origin) return callback(null, true);
+        if (allowedOrigins && allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+        if (!isProduction) {
+            try {
+                const url = new URL(origin);
+                if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
+                    return callback(null, true);
+                }
+            } catch (_) {}
+        }
+        const corsErr = new Error("CORS policy rejected access from this origin.");
+        corsErr.statusCode = 403;
+        return callback(corsErr);
+    },
+    credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParserMiddleware);
+app.use(sessionMiddleware);
 
 // ---------- Static frontend files ----------
 // Express serves everything in public/ (HTML, CSS, JS assets).
@@ -96,6 +127,11 @@ async function startServer() {
         console.log("==================================================");
         console.log(`  Eventify Server is running on http://localhost:${PORT}`);
         console.log(`  Open your browser and visit: http://localhost:${PORT}`);
+        if (process.env.NODE_ENV === "production") {
+            console.log("  [Security] Production mode: Development seed accounts are unconditionally disabled.");
+        } else {
+            console.log("  [Security] Development mode: Seed accounts active.");
+        }
         console.log("==================================================");
     });
 

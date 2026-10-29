@@ -1,384 +1,414 @@
+/**
+ * public/js/admin.js
+ *
+ * Eventify — Administrator Dashboard Controller
+ *
+ * Connects the admin dashboard to:
+ *   - GET /api/auth/me      — Verifies administrator identity & permissions.
+ *   - GET /api/admin/stats  — Loads live platform statistics (users, events, bookings, revenue).
+ *   - GET /api/events       — Loads platform event catalog.
+ *   - GET /api/categories   — Loads real event categories.
+ */
 
-const demoUsers = [
-    {
-        id: 1,
-        name: "Admin User",
-        email: "admin@example.com",
-        role: "ADMIN",
-        status: "ACTIVE"
-    },
-    {
-        id: 2,
-        name: "Priya Sharma",
-        email: "priya@example.com",
-        role: "ORGANIZER",
-        status: "ACTIVE"
-    },
-    {
-        id: 3,
-        name: "Rahul Patel",
-        email: "rahul@example.com",
-        role: "ATTENDEE",
-        status: "ACTIVE"
-    },
-    {
-        id: 4,
-        name: "Neha Shah",
-        email: "neha@example.com",
-        role: "ORGANIZER",
-        status: "SUSPENDED"
-    }
-];
+(function () {
+    "use strict";
 
-const demoEvents = [
-    {
-        id: 101,
-        title: "Future of Technology Summit",
-        organizer: "Priya Sharma",
-        category: "Technology",
-        date: "2027-01-15",
-        status: "PUBLISHED"
-    },
-    {
-        id: 102,
-        title: "Creative Design Workshop",
-        organizer: "Priya Sharma",
-        category: "Workshop",
-        date: "2027-02-10",
-        status: "PUBLISHED"
-    },
-    {
-        id: 103,
-        title: "Startup Networking Meetup",
-        organizer: "Neha Shah",
-        category: "Business",
-        date: "2027-03-20",
-        status: "DRAFT"
-    },
-    {
-        id: 104,
-        title: "Community Music Night",
-        organizer: "Neha Shah",
-        category: "Music",
-        date: "2027-04-12",
-        status: "CANCELLED"
-    }
-];
+    let currentUser = null;
+    let liveStats = null;
+    let allEvents = [];
+    let allCategories = [];
 
-const categories = [
-    "Technology",
-    "Music",
-    "Workshop",
-    "Business",
-    "Sports"
-];
+    // DOM Elements
+    const containerEl = document.querySelector(".admin-container");
+    const totalUsersEl = document.getElementById("total-users");
+    const totalEventsEl = document.getElementById("total-events");
+    const totalBookingsEl = document.getElementById("total-bookings");
+    const totalRevenueEl = document.getElementById("total-revenue");
 
-function escapeHTML(value) {
-    return String(value).replace(/[&<>"']/g, function (character) {
-        const entities = {
-            "&": "&amp;",
-            "<": "&lt;",
-            ">": "&gt;",
-            '"': "&quot;",
-            "'": "&#39;"
-        };
+    const usersTableEl = document.getElementById("users-table");
+    const userSearchInput = document.getElementById("user-search");
+    const adminEventsEl = document.getElementById("admin-events");
+    const eventStatusFilter = document.getElementById("event-status-filter");
+    const categoryListEl = document.getElementById("category-list");
+    const categoryFormEl = document.getElementById("category-form");
+    const categoryMsgEl = document.getElementById("category-message");
 
-        return entities[character];
-    });
-}
+    // =======================================================================
+    // HELPERS
+    // =======================================================================
 
-function updateAdminStats() {
-    document.getElementById("total-users").textContent =
-        demoUsers.length;
-
-    document.getElementById("total-events").textContent =
-        demoEvents.length;
-
-    document.getElementById("published-events").textContent =
-        demoEvents.filter(event => event.status === "PUBLISHED").length;
-
-    document.getElementById("total-categories").textContent =
-        categories.length;
-}
-
-function renderUsers() {
-    const searchText = document.getElementById("user-search")
-        .value.trim().toLowerCase();
-
-    const filteredUsers = demoUsers.filter(user => {
-        return user.name.toLowerCase().includes(searchText) ||
-            user.email.toLowerCase().includes(searchText) ||
-            user.role.toLowerCase().includes(searchText);
-    });
-
-    const table = document.getElementById("users-table");
-
-    if (filteredUsers.length === 0) {
-        table.innerHTML = `
-            <tr>
-                <td colspan="5">No matching users found.</td>
-            </tr>
-        `;
-        return;
+    function escapeText(value) {
+        return value ? String(value) : "";
     }
 
-    table.innerHTML = filteredUsers.map(user => {
-        const statusClass = user.status.toLowerCase();
-
-        const action = user.role === "ADMIN"
-            ? `<span>Protected</span>`
-            : `<button class="admin-action"
-                    data-user-action="toggle"
-                    data-user-id="${user.id}">
-                    ${user.status === "ACTIVE" ? "Suspend" : "Activate"}
-               </button>`;
-
-        return `
-            <tr>
-                <td class="user-name">${escapeHTML(user.name)}</td>
-                <td class="user-email">${escapeHTML(user.email)}</td>
-                <td><span class="role-badge">${escapeHTML(user.role)}</span></td>
-                <td>
-                    <span class="account-status ${statusClass}">
-                        ${escapeHTML(user.status)}
-                    </span>
-                </td>
-                <td>${action}</td>
-            </tr>
-        `;
-    }).join("");
-}
-
-function renderAdminEvents() {
-    const selectedStatus =
-        document.getElementById("event-status-filter").value;
-
-    const filteredEvents = demoEvents.filter(event => {
-        return selectedStatus === "ALL" ||
-            event.status === selectedStatus;
-    });
-
-    const container = document.getElementById("admin-events");
-
-    if (filteredEvents.length === 0) {
-        container.innerHTML = `
-            <div class="empty-state">No events found for this filter.</div>
-        `;
-        return;
+    function formatEventDate(dateString) {
+        if (!dateString) return "Date TBA";
+        try {
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return dateString;
+            return date.toLocaleDateString("en-IN", {
+                day: "numeric",
+                month: "short",
+                year: "numeric"
+            });
+        } catch (_) {
+            return dateString;
+        }
     }
 
-    container.innerHTML = filteredEvents.map(event => {
-        const statusClass = event.status.toLowerCase();
-
-        let actions = "";
-
-        if (event.status !== "PUBLISHED") {
-            actions += `
-                <button class="admin-action"
-                    data-event-action="publish"
-                    data-event-id="${event.id}">
-                    Publish
-                </button>
-            `;
-        }
-
-        if (event.status !== "CANCELLED") {
-            actions += `
-                <button class="admin-action danger"
-                    data-event-action="cancel"
-                    data-event-id="${event.id}">
-                    Cancel
-                </button>
-            `;
-        }
-
-        return `
-            <article class="admin-event-card">
-                <div class="admin-event-top">
-                    <div>
-                        <h3>${escapeHTML(event.title)}</h3>
-                        <p>Organizer: ${escapeHTML(event.organizer)}</p>
-                    </div>
-
-                    <span class="event-status ${statusClass}">
-                        ${escapeHTML(event.status)}
-                    </span>
-                </div>
-
-                <p>Category: ${escapeHTML(event.category)}</p>
-                <p>Date: ${escapeHTML(event.date)}</p>
-
-                <div class="admin-event-actions">
-                    ${actions}
-                </div>
-            </article>
-        `;
-    }).join("");
-}
-
-function renderCategories() {
-    const list = document.getElementById("category-list");
-
-    list.innerHTML = categories.map(category => `
-        <div class="category-chip">
-            <span>${escapeHTML(category)}</span>
-            <button class="remove-category"
-                data-category="${escapeHTML(category)}"
-                aria-label="Remove ${escapeHTML(category)}"
-                title="Remove category">×</button>
-        </div>
-    `).join("");
-}
-
-document.getElementById("user-search").addEventListener(
-    "input",
-    renderUsers
-);
-
-document.getElementById("event-status-filter").addEventListener(
-    "change",
-    renderAdminEvents
-);
-
-document.getElementById("users-table").addEventListener(
-    "click",
-    function (event) {
-        const button = event.target.closest("[data-user-action]");
-
-        if (!button) {
-            return;
-        }
-
-        const userId = Number(button.dataset.userId);
-        const user = demoUsers.find(item => item.id === userId);
-
-        if (!user || user.role === "ADMIN") {
-            return;
-        }
-
-        const newStatus = user.status === "ACTIVE"
-            ? "SUSPENDED"
-            : "ACTIVE";
-
-        const confirmed = window.confirm(
-            `${newStatus === "SUSPENDED" ? "Suspend" : "Activate"} ${user.name}?`
-        );
-
-        if (!confirmed) {
-            return;
-        }
-
-        user.status = newStatus;
-
-        renderUsers();
+    function formatRupees(amount) {
+        const num = Number(amount) || 0;
+        return "₹" + num.toLocaleString("en-IN");
     }
-);
 
-document.getElementById("admin-events").addEventListener(
-    "click",
-    function (event) {
-        const button = event.target.closest("[data-event-action]");
+    // =======================================================================
+    // AUTHORIZATION & ACCESS CONTROL
+    // =======================================================================
 
-        if (!button) {
-            return;
-        }
+    function renderAccessDenied(title, message, buttonText, buttonHref) {
+        if (!containerEl) return;
+        containerEl.innerHTML = "";
 
-        const eventId = Number(button.dataset.eventId);
-        const action = button.dataset.eventAction;
-        const selectedEvent = demoEvents.find(item => item.id === eventId);
+        const card = document.createElement("section");
+        card.className = "admin-section";
+        card.style.maxWidth = "600px";
+        card.style.margin = "60px auto";
+        card.style.textAlign = "center";
+        card.style.padding = "45px 30px";
 
-        if (!selectedEvent) {
-            return;
-        }
+        const icon = document.createElement("div");
+        icon.style.fontSize = "38px";
+        icon.style.marginBottom = "16px";
+        icon.textContent = "🛡️";
 
-        if (action === "publish") {
-            selectedEvent.status = "PUBLISHED";
-        } else if (action === "cancel") {
-            const confirmed = window.confirm(
-                `Cancel "${selectedEvent.title}"?`
+        const h1 = document.createElement("h1");
+        h1.style.fontSize = "26px";
+        h1.style.marginBottom = "14px";
+        h1.style.color = "#f4f4fb";
+        h1.textContent = title;
+
+        const p = document.createElement("p");
+        p.className = "muted";
+        p.style.marginBottom = "26px";
+        p.textContent = message;
+
+        const actionBtn = document.createElement("a");
+        actionBtn.className = "primary-button";
+        actionBtn.style.display = "inline-block";
+        actionBtn.style.textDecoration = "none";
+        actionBtn.href = buttonHref;
+        actionBtn.textContent = buttonText;
+
+        card.appendChild(icon);
+        card.appendChild(h1);
+        card.appendChild(p);
+        card.appendChild(actionBtn);
+        containerEl.appendChild(card);
+    }
+
+    async function checkAuthorization() {
+        if (!window.api || typeof window.api.getMe !== "function") {
+            renderAccessDenied(
+                "API Client Missing",
+                "Frontend API client is not loaded. Please refresh the page.",
+                "Reload Page",
+                "admin.html"
             );
+            return false;
+        }
 
-            if (!confirmed) {
-                return;
+        try {
+            const res = await window.api.getMe();
+            if (res && res.success && res.user) {
+                currentUser = res.user;
+
+                // Check role: strictly ADMIN only
+                if (currentUser.role !== "ADMIN") {
+                    renderAccessDenied(
+                        "Administrator Role Required",
+                        `Your account (${currentUser.email}) has the ${currentUser.role} role. Platform administration is restricted strictly to Administrator accounts.`,
+                        "← Back to Events",
+                        "index.html"
+                    );
+                    return false;
+                }
+
+                return true;
+            } else {
+                throw new Error("Unauthenticated");
             }
-
-            selectedEvent.status = "CANCELLED";
+        } catch (_) {
+            renderAccessDenied(
+                "Sign In Required",
+                "Please sign in with an administrator account to access platform management.",
+                "Sign In as Admin →",
+                "login.html?redirect=admin.html"
+            );
+            return false;
         }
-
-        updateAdminStats();
-        renderAdminEvents();
     }
-);
 
-document.getElementById("category-form").addEventListener(
-    "submit",
-    function (event) {
-        event.preventDefault();
+    // =======================================================================
+    // ADMIN STATISTICS INTEGRATION (GET /api/admin/stats)
+    // =======================================================================
 
-        const input = document.getElementById("category-name");
-        const message = document.getElementById("category-message");
-        const category = input.value.trim();
+    async function loadAdminStats() {
+        if (totalUsersEl) totalUsersEl.textContent = "...";
+        if (totalEventsEl) totalEventsEl.textContent = "...";
+        if (totalBookingsEl) totalBookingsEl.textContent = "...";
+        if (totalRevenueEl) totalRevenueEl.textContent = "...";
 
-        if (!category) {
-            message.textContent = "Enter a category name.";
-            return;
+        try {
+            const res = await window.api.getAdminStats();
+            if (res && res.success && res.stats) {
+                liveStats = res.stats;
+
+                if (totalUsersEl) {
+                    totalUsersEl.textContent = Number(liveStats.totalUsers || 0).toLocaleString("en-IN");
+                }
+                if (totalEventsEl) {
+                    totalEventsEl.textContent = Number(liveStats.totalEvents || 0).toLocaleString("en-IN");
+                }
+                if (totalBookingsEl) {
+                    totalBookingsEl.textContent = Number(liveStats.totalBookings || 0).toLocaleString("en-IN");
+                }
+                if (totalRevenueEl) {
+                    totalRevenueEl.textContent = formatRupees(liveStats.revenue);
+                }
+            } else {
+                throw new Error("Unable to parse statistics.");
+            }
+        } catch (err) {
+            console.error("[Admin Stats] Failed to load stats:", err);
+            if (totalUsersEl) totalUsersEl.textContent = "Error";
+            if (totalEventsEl) totalEventsEl.textContent = "Error";
+            if (totalBookingsEl) totalBookingsEl.textContent = "Error";
+            if (totalRevenueEl) totalRevenueEl.textContent = "Error";
         }
-
-        const exists = categories.some(
-            item => item.toLowerCase() === category.toLowerCase()
-        );
-
-        if (exists) {
-            message.textContent = "This category already exists.";
-            return;
-        }
-
-        categories.push(category);
-        input.value = "";
-
-        message.textContent = "Demo category added successfully.";
-
-        updateAdminStats();
-        renderCategories();
     }
-);
 
-document.getElementById("category-list").addEventListener(
-    "click",
-    function (event) {
-        const button = event.target.closest("[data-category]");
+    // =======================================================================
+    // EVENT CATALOG INTEGRATION (GET /api/events)
+    // =======================================================================
 
-        if (!button) {
+    function renderAdminEvents() {
+        if (!adminEventsEl) return;
+        adminEventsEl.innerHTML = "";
+
+        const selectedStatus = eventStatusFilter ? eventStatusFilter.value : "ALL";
+
+        const filtered = allEvents.filter(e => {
+            if (selectedStatus === "ALL") return true;
+            return (e.status || "PUBLISHED").toUpperCase() === selectedStatus.toUpperCase();
+        });
+
+        if (filtered.length === 0) {
+            const emptyDiv = document.createElement("div");
+            emptyDiv.className = "empty-state";
+            emptyDiv.textContent = selectedStatus === "ALL"
+                ? "No events found in the catalog."
+                : `No events match the "${selectedStatus}" filter.`;
+            adminEventsEl.appendChild(emptyDiv);
             return;
         }
 
-        const category = button.dataset.category;
+        const fragment = document.createDocumentFragment();
 
-        const confirmed = window.confirm(
-            `Remove the "${category}" category from the demo?`
-        );
+        filtered.forEach(event => {
+            const card = document.createElement("article");
+            card.className = "admin-event-card";
 
-        if (!confirmed) {
-            return;
-        }
+            const topDiv = document.createElement("div");
+            topDiv.className = "admin-event-top";
 
-        const index = categories.findIndex(
-            item => item === category
-        );
+            const titleGroup = document.createElement("div");
+            const h3 = document.createElement("h3");
+            h3.textContent = escapeText(event.title);
 
-        if (index !== -1) {
-            categories.splice(index, 1);
-        }
+            const categoryP = document.createElement("p");
+            categoryP.textContent = `Category: ${escapeText(event.category || "General")}`;
 
-        document.getElementById("category-message").textContent =
-            "Demo category removed.";
+            titleGroup.appendChild(h3);
+            titleGroup.appendChild(categoryP);
 
-        updateAdminStats();
-        renderCategories();
+            const statusClass = (event.status || "published").toLowerCase();
+            const statusSpan = document.createElement("span");
+            statusSpan.className = `event-status ${statusClass}`;
+            statusSpan.textContent = escapeText(event.status || "PUBLISHED");
+
+            topDiv.appendChild(titleGroup);
+            topDiv.appendChild(statusSpan);
+
+            const dateP = document.createElement("p");
+            dateP.textContent = `Date: ${formatEventDate(event.date)}`;
+
+            const venueCity = event.venue && event.city
+                ? `${event.venue}, ${event.city}`
+                : event.venue || event.city || "Venue TBA";
+            const locationP = document.createElement("p");
+            locationP.textContent = `Location: ${venueCity}`;
+
+            const priceP = document.createElement("p");
+            const priceNum = Number(event.price) || 0;
+            priceP.textContent = `Price: ${priceNum === 0 ? "Free" : formatRupees(priceNum)} · Capacity: ${Number(event.capacity || 0).toLocaleString("en-IN")}`;
+
+            const actionsDiv = document.createElement("div");
+            actionsDiv.className = "admin-event-actions";
+
+            const viewLink = document.createElement("a");
+            viewLink.className = "admin-action";
+            viewLink.href = `event.html?id=${encodeURIComponent(event.id)}`;
+            viewLink.textContent = "View Public Details →";
+
+            actionsDiv.appendChild(viewLink);
+
+            card.appendChild(topDiv);
+            card.appendChild(dateP);
+            card.appendChild(locationP);
+            card.appendChild(priceP);
+            card.appendChild(actionsDiv);
+
+            fragment.appendChild(card);
+        });
+
+        adminEventsEl.appendChild(fragment);
     }
-);
 
-updateAdminStats();
-renderUsers();
-renderAdminEvents();
-renderCategories();
+    async function loadAdminEvents() {
+        if (!adminEventsEl) return;
+        adminEventsEl.innerHTML = "";
+
+        const loadingDiv = document.createElement("div");
+        loadingDiv.className = "empty-state";
+        loadingDiv.textContent = "Loading event catalog...";
+        adminEventsEl.appendChild(loadingDiv);
+
+        try {
+            const res = await window.api.getEvents();
+            allEvents = (res && Array.isArray(res.data)) ? res.data : [];
+            renderAdminEvents();
+        } catch (err) {
+            adminEventsEl.innerHTML = "";
+            const errDiv = document.createElement("div");
+            errDiv.className = "empty-state";
+            errDiv.style.color = "#f87171";
+            errDiv.textContent = `Unable to load events: ${err.message || "Server error"}`;
+            adminEventsEl.appendChild(errDiv);
+        }
+    }
+
+    // =======================================================================
+    // CATEGORY MANAGEMENT INTEGRATION (GET /api/categories)
+    // =======================================================================
+
+    function renderCategories() {
+        if (!categoryListEl) return;
+        categoryListEl.innerHTML = "";
+
+        if (allCategories.length === 0) {
+            const emptyP = document.createElement("p");
+            emptyP.className = "muted";
+            emptyP.textContent = "No categories available.";
+            categoryListEl.appendChild(emptyP);
+            return;
+        }
+
+        const fragment = document.createDocumentFragment();
+
+        allCategories.forEach(cat => {
+            const chip = document.createElement("div");
+            chip.className = "category-chip";
+
+            const nameSpan = document.createElement("span");
+            nameSpan.textContent = typeof cat === "string" ? cat : (cat.name || "");
+
+            chip.appendChild(nameSpan);
+            fragment.appendChild(chip);
+        });
+
+        categoryListEl.appendChild(fragment);
+    }
+
+    async function loadCategories() {
+        try {
+            const res = await window.api.getCategories();
+            allCategories = (res && Array.isArray(res.data)) ? res.data : [];
+            renderCategories();
+        } catch (err) {
+            console.error("[Categories] Failed to load:", err);
+        }
+    }
+
+    // =======================================================================
+    // USER MANAGEMENT & LIMITATION REPORTING
+    // =======================================================================
+
+    function renderUserSectionState() {
+        if (!usersTableEl) return;
+        usersTableEl.innerHTML = "";
+
+        const row = document.createElement("tr");
+        const cell = document.createElement("td");
+        cell.colSpan = 5;
+        cell.style.textAlign = "center";
+        cell.style.padding = "30px 18px";
+        cell.style.color = "#aaa8c3";
+        cell.style.lineHeight = "1.6";
+
+        const countText = liveStats ? `Live registered accounts count: ${liveStats.totalUsers}. ` : "";
+        cell.textContent = `${countText}Granular user directory listing (GET /api/admin/users) is deferred to future backend implementation. Platform aggregate metrics are loaded live above.`;
+
+        row.appendChild(cell);
+        usersTableEl.appendChild(row);
+    }
+
+    // =======================================================================
+    // LISTENERS & INITIALIZATION
+    // =======================================================================
+
+    function initListeners() {
+        if (eventStatusFilter) {
+            eventStatusFilter.addEventListener("change", renderAdminEvents);
+        }
+
+        if (categoryFormEl) {
+            categoryFormEl.addEventListener("submit", (e) => {
+                e.preventDefault();
+                if (categoryMsgEl) {
+                    categoryMsgEl.textContent = "Notice: Category creation endpoint (POST /api/categories) is deferred to future backend phases.";
+                    categoryMsgEl.style.color = "#c4b5fd";
+                }
+            });
+        }
+
+        if (userSearchInput) {
+            userSearchInput.addEventListener("input", () => {
+                if (usersTableEl) {
+                    const cell = usersTableEl.querySelector("td");
+                    if (cell) {
+                        cell.textContent = "Live user directory filtering requires the deferred GET /api/admin/users endpoint. Aggregate user count is displayed above.";
+                    }
+                }
+            });
+        }
+    }
+
+    async function init() {
+        const authorized = await checkAuthorization();
+        if (authorized) {
+            initListeners();
+            await Promise.all([
+                loadAdminStats(),
+                loadAdminEvents(),
+                loadCategories()
+            ]);
+            renderUserSectionState();
+        }
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", init);
+    } else {
+        init();
+    }
+})();
