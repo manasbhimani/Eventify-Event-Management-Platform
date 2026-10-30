@@ -5,7 +5,7 @@
  *
  * Provides:
  *   1. parseCookies & cookieParserMiddleware: Zero-dependency RFC 6265 cookie parser.
- *   2. sessionMiddleware: Authenticates requests using in-memory session tokens,
+ *   2. sessionMiddleware: Authenticates requests using Oracle-persisted session tokens,
  *      issues guest CSRF tokens, and clears stale/expired session cookies.
  *   3. requireAuth: Guards routes requiring an authenticated user (401).
  *   4. requireRole: Guards routes requiring specific roles (403).
@@ -18,7 +18,7 @@
 "use strict";
 
 const crypto = require("crypto");
-const store  = require("../data/store");
+const { sessionRepository } = require("../db/repositories");
 
 const isProduction = process.env.NODE_ENV === "production";
 
@@ -79,54 +79,58 @@ function cookieParserMiddleware(req, res, next) {
 }
 
 /**
- * Session verification and guest CSRF provisioning middleware.
- * - Attaches req.session and req.user if an active session cookie is present.
+ * Session verification and guest CSRF provisioning middleware backed by Oracle Database.
+ * - Attaches req.session and req.user if an active session cookie is present in Oracle.
  * - Automatically issues a guest CSRF token cookie if no CSRF cookie exists.
  * - Evicts and clears stale or expired session cookies.
  */
-function sessionMiddleware(req, res, next) {
-    // 1. Ensure a CSRF token cookie is present for all visitors (authenticated or guest)
-    if (!req.cookies || !req.cookies[CSRF_COOKIE_NAME] || req.cookies[CSRF_COOKIE_NAME].trim() === "") {
-        const guestCsrfToken = crypto.randomBytes(32).toString("hex");
-        res.cookie(CSRF_COOKIE_NAME, guestCsrfToken, CSRF_COOKIE_OPTIONS);
-        if (!req.cookies) req.cookies = {};
-        req.cookies[CSRF_COOKIE_NAME] = guestCsrfToken;
+async function sessionMiddleware(req, res, next) {
+    try {
+        // 1. Ensure a CSRF token cookie is present for all visitors (authenticated or guest)
+        if (!req.cookies || !req.cookies[CSRF_COOKIE_NAME] || req.cookies[CSRF_COOKIE_NAME].trim() === "") {
+            const guestCsrfToken = crypto.randomBytes(32).toString("hex");
+            res.cookie(CSRF_COOKIE_NAME, guestCsrfToken, CSRF_COOKIE_OPTIONS);
+            if (!req.cookies) req.cookies = {};
+            req.cookies[CSRF_COOKIE_NAME] = guestCsrfToken;
+        }
+
+        // 2. Validate session cookie if provided
+        const sessionId = req.cookies && req.cookies[SESSION_COOKIE_NAME];
+
+        if (!sessionId || typeof sessionId !== "string" || sessionId.trim() === "" || sessionId === "undefined" || sessionId === "null") {
+            req.session = null;
+            req.user = null;
+            return next();
+        }
+
+        const session = await sessionRepository.getSession(sessionId);
+
+        if (!session) {
+            req.session = null;
+            req.user = null;
+
+            // Clear expired or invalid session cookie from client
+            res.clearCookie(SESSION_COOKIE_NAME, {
+                path: "/",
+                httpOnly: true,
+                sameSite: "lax",
+                secure: isProduction
+            });
+            return next();
+        }
+
+        req.session = session;
+        req.user = {
+            id: session.userId,
+            name: session.name,
+            email: session.email,
+            role: session.role
+        };
+
+        next();
+    } catch (err) {
+        next(err);
     }
-
-    // 2. Validate session cookie if provided
-    const sessionId = req.cookies && req.cookies[SESSION_COOKIE_NAME];
-
-    if (!sessionId || typeof sessionId !== "string" || sessionId.trim() === "" || sessionId === "undefined" || sessionId === "null") {
-        req.session = null;
-        req.user = null;
-        return next();
-    }
-
-    const session = store.getSession(sessionId);
-
-    if (!session) {
-        req.session = null;
-        req.user = null;
-
-        // Clear expired or invalid session cookie from client
-        res.clearCookie(SESSION_COOKIE_NAME, {
-            path: "/",
-            httpOnly: true,
-            sameSite: "lax",
-            secure: isProduction
-        });
-        return next();
-    }
-
-    req.session = session;
-    req.user = {
-        id: session.userId,
-        name: session.name,
-        email: session.email,
-        role: session.role
-    };
-
-    next();
 }
 
 /**

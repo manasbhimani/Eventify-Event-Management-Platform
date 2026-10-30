@@ -72,6 +72,121 @@ async function executeQuery(sql, binds = {}, options = {}) {
 }
 
 /**
+ * Execute a unit of work within a managed transaction.
+ *
+ * Acquires a single connection from the pool, provides an execution wrapper
+ * with autoCommit disabled by default, commits upon successful callback completion,
+ * rolls back on any error while preserving the original error, and guarantees connection release.
+ *
+ * @param {Function} callback - async function(tx) => Promise<any>
+ *   where tx provides:
+ *     - tx.connection: the raw active connection
+ *     - tx.execute(sql, binds, options): execute wrapper with autoCommit: false
+ * @returns {Promise<any>} Result returned by the callback function
+ */
+async function withTransaction(callback) {
+    if (!pool) {
+        throw new Error("Database connection pool is not initialized. Please configure Oracle DB credentials.");
+    }
+    if (typeof callback !== "function") {
+        throw new TypeError("withTransaction expects a callback function as its argument.");
+    }
+
+    let connection;
+    try {
+        connection = await pool.getConnection();
+
+        // Transaction client wrapper
+        const tx = {
+            connection,
+            execute: async (sql, binds = {}, options = {}) => {
+                const txOptions = {
+                    outFormat: oracledb.OUT_FORMAT_OBJECT,
+                    autoCommit: false, // strictly false for transactional operations
+                    ...options
+                };
+                return connection.execute(sql, binds, txOptions);
+            }
+        };
+
+        const result = await callback(tx);
+        await connection.commit();
+        return result;
+    } catch (err) {
+        if (connection) {
+            try {
+                await connection.rollback();
+            } catch (rollbackErr) {
+                console.error("[Database] Error during transaction rollback:", rollbackErr.message);
+            }
+        }
+        throw err; // Preserves original error intact
+    } finally {
+        if (connection) {
+            try {
+                await connection.close();
+            } catch (closeErr) {
+                console.error("[Database] Error closing transactional connection:", closeErr.message);
+            }
+        }
+    }
+}
+
+/**
+ * Safe Oracle error mapping helper.
+ * Extracts standard HTTP status codes and friendly error codes from Oracle error numbers.
+ * @param {Error} err - Error caught from an Oracle operation
+ * @returns {object} { statusCode, code, message }
+ */
+function mapOracleError(err) {
+    if (!err) {
+        return { statusCode: 500, code: "DATABASE_ERROR", message: "Unknown database error." };
+    }
+
+    const errorNum = err.errorNum || (err.message && (err.message.match(/ORA-(\d{5})/) || [])[1]);
+    const num = Number(errorNum);
+
+    switch (num) {
+        case 1: // ORA-00001
+            return {
+                statusCode: 409,
+                code: "UNIQUE_CONSTRAINT_VIOLATION",
+                message: "A record with this identifier or unique field already exists."
+            };
+        case 2290: // ORA-02290
+            return {
+                statusCode: 400,
+                code: "CHECK_CONSTRAINT_VIOLATION",
+                message: "The provided data violates a database validation rule."
+            };
+        case 2291: // ORA-02291
+            return {
+                statusCode: 400,
+                code: "FOREIGN_KEY_NOT_FOUND",
+                message: "Referenced parent record does not exist."
+            };
+        case 2292: // ORA-02292
+            return {
+                statusCode: 400,
+                code: "CHILD_RECORD_EXISTS",
+                message: "Cannot delete or alter this record because related child records exist."
+            };
+        case 54: // ORA-00054
+            return {
+                statusCode: 409,
+                code: "RESOURCE_BUSY",
+                message: "The requested resource is currently locked by another transaction. Please try again."
+            };
+        default:
+            return {
+                statusCode: 500,
+                code: "DATABASE_ERROR",
+                message: "A database error occurred."
+            };
+    }
+}
+
+/**
  * Close database pool on server shutdown
  */
 async function closeDB() {
@@ -89,7 +204,10 @@ async function closeDB() {
 module.exports = {
     initDB,
     executeQuery,
+    withTransaction,
+    mapOracleError,
     closeDB,
     getIsConnected: () => isConnected,
+    getPool: () => pool,
     dbConfig
 };
