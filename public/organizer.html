@@ -15,11 +15,17 @@
 
     <header class="navbar">
         <a class="logo" href="index.html">eventify<span>.</span></a>
+
         <nav class="nav-links">
             <a href="index.html">Explore Events</a>
             <a href="bookings.html">My Bookings</a>
-            <a href="login.html">Login</a>
+            <a href="organizer.html" class="active">Organizer</a>
         </nav>
+
+        <div class="nav-actions">
+            <a class="login-link" href="login.html">Log in</a>
+            <a class="btn btn-primary" href="register.html">Get Started</a>
+        </div>
     </header>
 
     <main class="organizer-container">
@@ -86,13 +92,8 @@
 
                     <div class="form-field">
                         <label for="event-category">Category</label>
-                        <select id="event-category" required>
-                            <option value="Technology">Technology</option>
-                            <option value="Music">Music</option>
-                            <option value="Workshop">Workshop</option>
-                            <option value="Business">Business</option>
-                            <option value="Sports">Sports</option>
-                            <option value="Other">Other</option>
+                        <select id="event-category" required disabled>
+                            <option value="" disabled selected>Loading categories...</option>
                         </select>
                     </div>
 
@@ -115,8 +116,8 @@
                     </div>
 
                     <div class="form-field">
-                        <label for="event-time">Start time</label>
-                        <input id="event-time" type="time" required>
+                        <label for="event-time">Start time <span class="muted" style="font-size: 12px; font-weight: normal;">(optional)</span></label>
+                        <input id="event-time" type="time">
                     </div>
 
                     <div class="form-field">
@@ -168,7 +169,7 @@
         </section>
 
         <p class="demo-notice">
-            In-memory store: events created here are immediately available across Eventify and reset on server restart.
+            Oracle-backed storage: events created here are persisted in Oracle Database and available platform-wide.
         </p>
 
     </main>

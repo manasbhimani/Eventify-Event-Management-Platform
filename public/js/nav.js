@@ -32,8 +32,17 @@
         const navLinks = document.querySelector(".nav-links");
 
         if (currentUser) {
-            // Add role-specific navigation links if appropriate
+            // Standardize navigation links for authenticated users
             if (navLinks) {
+                // Ensure My Bookings link is present
+                if (!navLinks.querySelector('a[href="bookings.html"]')) {
+                    const bookingsLink = document.createElement("a");
+                    bookingsLink.href = "bookings.html";
+                    bookingsLink.textContent = "My Bookings";
+                    navLinks.appendChild(bookingsLink);
+                }
+
+                // Add Organizer link for ORGANIZER and ADMIN
                 if (currentUser.role === "ORGANIZER" || currentUser.role === "ADMIN") {
                     if (!navLinks.querySelector('a[href="organizer.html"]')) {
                         const orgLink = document.createElement("a");
@@ -42,6 +51,8 @@
                         navLinks.appendChild(orgLink);
                     }
                 }
+
+                // Add Admin link for ADMIN
                 if (currentUser.role === "ADMIN") {
                     if (!navLinks.querySelector('a[href="admin.html"]')) {
                         const adminLink = document.createElement("a");
@@ -50,15 +61,22 @@
                         navLinks.appendChild(adminLink);
                     }
                 }
+
+                // If any stray login links exist in navLinks, remove them
+                const strayLoginLink = navLinks.querySelector('a[href="login.html"]');
+                if (strayLoginLink) {
+                    strayLoginLink.remove();
+                }
             }
 
-            // User identity & logout action
+            // User identity & logout action using CSS classes (no injected inline styles)
+            const roleClass = (currentUser.role || "").toLowerCase();
             const userMarkup = `
-                <span class="nav-user-info" style="display:inline-flex;align-items:center;gap:8px;font-size:13px;color:#a1a5bb;">
-                    <span>Hi, <strong style="color:#f4f4fb;">${escapeText(currentUser.name)}</strong></span>
-                    <span class="role-badge" style="background:rgba(167,139,250,0.18);color:#a78bfa;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;">${currentUser.role}</span>
+                <span class="nav-user-info">
+                    <span>Hi, <strong class="nav-user-name">${escapeText(currentUser.name)}</strong></span>
+                    <span class="role-badge ${roleClass}">${escapeText(currentUser.role)}</span>
                 </span>
-                <button type="button" id="nav-logout-btn" class="btn" style="background:transparent;color:#a1a5bb;border:1px solid #292c40;padding:6px 14px;font-size:13px;cursor:pointer;border-radius:8px;">
+                <button type="button" id="nav-logout-btn" class="nav-logout-btn" aria-label="Log out of Eventify">
                     Log out
                 </button>
             `;
@@ -66,16 +84,10 @@
             if (navActions) {
                 navActions.innerHTML = userMarkup;
             } else if (navLinks) {
-                const loginLink = navLinks.querySelector('a[href="login.html"]');
-                if (loginLink) {
-                    const container = document.createElement("div");
-                    container.className = "nav-actions";
-                    container.style.display = "inline-flex";
-                    container.style.alignItems = "center";
-                    container.style.gap = "14px";
-                    container.innerHTML = userMarkup;
-                    loginLink.replaceWith(container);
-                }
+                const container = document.createElement("div");
+                container.className = "nav-actions";
+                container.innerHTML = userMarkup;
+                navLinks.parentNode.insertBefore(container, navLinks.nextSibling);
             }
 
             const logoutBtn = document.getElementById("nav-logout-btn");

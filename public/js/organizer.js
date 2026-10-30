@@ -14,6 +14,7 @@
 
     let currentUser = null;
     let allEvents = [];
+    let availableCategories = [];
     let isSubmitting = false;
 
     // DOM Elements
@@ -157,11 +158,16 @@
     // =======================================================================
 
     function updateStatistics() {
+        // Calculate statistics using only events where creatorId === currentUser.id
+        const myEvents = (currentUser && currentUser.id)
+            ? allEvents.filter(e => Number(e.creatorId) === Number(currentUser.id))
+            : [];
+
         if (statEventsEl) {
-            statEventsEl.textContent = allEvents.length.toLocaleString("en-IN");
+            statEventsEl.textContent = myEvents.length.toLocaleString("en-IN");
         }
 
-        const totalCapacity = allEvents
+        const totalCapacity = myEvents
             .filter(e => e.status !== "CANCELLED")
             .reduce((sum, e) => sum + (Number(e.capacity) || 0), 0);
 
@@ -169,14 +175,14 @@
             statTicketsEl.textContent = totalCapacity.toLocaleString("en-IN");
         }
 
-        // Note: GET /api/events returns event catalog; per-event booking registrations
-        // are aggregated through the bookings system. Displayed accurately.
+        // Display clear "Not available yet" state for organizer-specific registrations
         if (statRegistrationsEl) {
-            statRegistrationsEl.textContent = "Catalog Live";
-            statRegistrationsEl.title = "Aggregate platform registrations tracked via Bookings API";
+            statRegistrationsEl.textContent = "Not available yet";
+            statRegistrationsEl.title = "Organizer-specific registration aggregates are not yet supported by the backend.";
+            statRegistrationsEl.classList.add("stat-unavailable");
         }
 
-        const potentialValue = allEvents
+        const potentialValue = myEvents
             .filter(e => e.status === "PUBLISHED")
             .reduce((sum, e) => sum + ((Number(e.price) || 0) * (Number(e.capacity) || 0)), 0);
 
@@ -241,25 +247,8 @@
             // Ownership Badge (strictly verifies API creatorId)
             const isOwned = currentUser && event.creatorId && Number(event.creatorId) === Number(currentUser.id);
             const ownerBadge = document.createElement("span");
-            ownerBadge.style.fontSize = "11px";
-            ownerBadge.style.padding = "3px 8px";
-            ownerBadge.style.borderRadius = "6px";
-            ownerBadge.style.fontWeight = "600";
-
-            if (isOwned) {
-                ownerBadge.style.background = "rgba(139, 92, 246, 0.2)";
-                ownerBadge.style.color = "#c4b5fd";
-                ownerBadge.textContent = "Created by You";
-            } else {
-                ownerBadge.style.background = "rgba(255, 255, 255, 0.06)";
-                ownerBadge.style.color = "#a1a5bb";
-                ownerBadge.textContent = "Catalog Listing";
-            }
-
-            const statusClass = (event.status || "published").toLowerCase();
-            const statusSpan = document.createElement("span");
-            statusSpan.className = `event-status ${statusClass}`;
-            statusSpan.textContent = escapeText(event.status || "PUBLISHED");
+            ownerBadge.className = `owner-badge ${isOwned ? "owned" : "catalog"}`;
+            ownerBadge.textContent = isOwned ? "Created by You" : "Catalog Listing";
 
             badgesGroup.appendChild(ownerBadge);
             badgesGroup.appendChild(statusSpan);
@@ -277,7 +266,8 @@
             metaDiv.className = "event-meta";
 
             const dateSpan = document.createElement("span");
-            dateSpan.textContent = `📅 ${formatEventDate(event.date)}`;
+            const timeSuffix = event.time ? ` · 🕒 ${event.time}` : "";
+            dateSpan.textContent = `📅 ${formatEventDate(event.date)}${timeSuffix}`;
 
             const venueSpan = document.createElement("span");
             const venueCity = event.venue && event.city
@@ -367,6 +357,47 @@
     }
 
     // =======================================================================
+    // CATEGORY SYNCHRONIZATION WITH ORACLE (GET /api/categories)
+    // =======================================================================
+
+    async function loadCategories() {
+        const categorySelectEl = document.getElementById("event-category");
+        if (!categorySelectEl) return;
+
+        categorySelectEl.disabled = true;
+        categorySelectEl.innerHTML = '<option value="" disabled selected>Loading categories...</option>';
+
+        try {
+            const res = await window.api.getCategories();
+            availableCategories = (res && Array.isArray(res.data)) ? res.data : [];
+
+            if (availableCategories.length === 0) {
+                categorySelectEl.innerHTML = '<option value="" disabled selected>No categories available</option>';
+                categorySelectEl.disabled = true;
+                return;
+            }
+
+            categorySelectEl.innerHTML = '<option value="" disabled selected>Select a category</option>';
+            availableCategories.forEach(cat => {
+                const opt = document.createElement("option");
+                const catName = typeof cat === "string" ? cat : (cat.name || "");
+                opt.value = catName;
+                opt.textContent = catName;
+                categorySelectEl.appendChild(opt);
+            });
+
+            categorySelectEl.disabled = false;
+        } catch (err) {
+            console.error("[Organizer] Failed to load categories:", err);
+            categorySelectEl.innerHTML = '<option value="" disabled selected>Error loading categories</option>';
+            categorySelectEl.disabled = true;
+            if (formMessageEl) {
+                setMessage(formMessageEl, "Unable to load event categories from server. Please refresh or try again.", true);
+            }
+        }
+    }
+
+    // =======================================================================
     // EVENT CREATION FORM HANDLER
     // =======================================================================
 
@@ -375,6 +406,10 @@
             openFormBtn.addEventListener("click", () => {
                 eventFormSection.hidden = false;
                 eventFormSection.scrollIntoView({ behavior: "smooth", block: "start" });
+                const titleInput = document.getElementById("event-title");
+                if (titleInput) {
+                    titleInput.focus();
+                }
             });
         }
 
@@ -400,6 +435,8 @@
                 const city = document.getElementById("event-city").value.trim();
                 const venue = document.getElementById("event-venue").value.trim();
                 const date = document.getElementById("event-date").value;
+                const timeInput = document.getElementById("event-time");
+                const time = timeInput ? timeInput.value.trim() : "";
                 const price = Number(document.getElementById("event-price").value);
                 const capacity = Number(document.getElementById("event-capacity").value);
                 const description = document.getElementById("event-description").value.trim();
@@ -408,6 +445,17 @@
                 // Client-side validations
                 if (!title || !category || !date) {
                     setMessage(formMessageEl, "Event name, category, and date are required.", true);
+                    return;
+                }
+
+                // Strict category validation against loaded Oracle categories
+                const isValidCategory = availableCategories.some(c => {
+                    const cName = typeof c === "string" ? c : (c.name || "");
+                    return cName.toLowerCase() === category.trim().toLowerCase();
+                });
+
+                if (!isValidCategory) {
+                    setMessage(formMessageEl, "Please select a valid event category from the list.", true);
                     return;
                 }
 
@@ -440,6 +488,7 @@
                         title,
                         category,
                         date,
+                        time: time || undefined,
                         city: city || "Surat",
                         venue: venue || "Main Auditorium",
                         price,
@@ -452,6 +501,13 @@
                         setMessage(formMessageEl, `✓ Event "${newEvent.title}" created successfully!`, false);
 
                         createEventForm.reset();
+                        const catSelect = document.getElementById("event-category");
+                        if (catSelect) {
+                            catSelect.value = "";
+                        }
+                        if (timeInput) {
+                            timeInput.value = "";
+                        }
                         document.getElementById("event-price").value = 199;
                         document.getElementById("event-capacity").value = 100;
 
@@ -491,8 +547,16 @@
         const authorized = await checkAuthorization();
         if (authorized) {
             initFormHandlers();
-            await loadEvents();
+            await Promise.all([
+                loadCategories(),
+                loadEvents()
+            ]);
         }
+    }
+
+    if (typeof window !== "undefined") {
+        window.loadOrganizerCategories = loadCategories;
+        window.getAvailableCategories = () => availableCategories;
     }
 
     if (document.readyState === "loading") {

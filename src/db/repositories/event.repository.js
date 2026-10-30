@@ -18,6 +18,7 @@ const DEFAULT_EVENT_IMAGE = "https://images.unsplash.com/photo-1540575467063-178
  */
 function formatEvent(row) {
     if (!row) return null;
+    const timeVal = (row.EVENT_TIME && row.EVENT_TIME !== "00:00") ? row.EVENT_TIME : null;
     return {
         id: Number(row.EVENT_ID),
         creatorId: (row.CREATOR_ID !== null && row.CREATOR_ID !== undefined) ? Number(row.CREATOR_ID) : null,
@@ -25,6 +26,7 @@ function formatEvent(row) {
         category: row.CATEGORY_NAME,
         title: row.TITLE,
         date: row.EVENT_DATE, // Already serialized as YYYY-MM-DD via TO_CHAR
+        time: timeVal,
         city: row.CITY,
         venue: row.VENUE,
         price: Number(row.PRICE),
@@ -47,6 +49,7 @@ async function getEvents(filters = {}, executor = null) {
     let sql = `
         SELECT e.event_id, e.creator_id, e.category_id, c.name AS category_name,
                e.title, TO_CHAR(e.event_date, 'YYYY-MM-DD') AS event_date,
+               TO_CHAR(e.event_date, 'HH24:MI') AS event_time,
                e.city, e.venue, e.price, e.capacity, e.description,
                e.image_url, e.status
         FROM EVENTS e
@@ -94,6 +97,7 @@ async function getEventById(id, executor = null) {
     const sql = `
         SELECT e.event_id, e.creator_id, e.category_id, c.name AS category_name,
                e.title, TO_CHAR(e.event_date, 'YYYY-MM-DD') AS event_date,
+               TO_CHAR(e.event_date, 'HH24:MI') AS event_time,
                e.city, e.venue, e.price, e.capacity, e.description,
                e.image_url, e.status
         FROM EVENTS e
@@ -120,6 +124,7 @@ async function createEvent(
         category,
         categoryId,
         date,
+        time = null,
         city = "Surat",
         venue = "Main Auditorium",
         price = 0,
@@ -177,11 +182,23 @@ async function createEvent(
     const numCapacity = Number(capacity) || 100;
     const resolvedImage = imageUrl || image || DEFAULT_EVENT_IMAGE;
 
+    const dateStr = date.trim().split("T")[0];
+    let eventDateTimeStr;
+    if (time && typeof time === "string" && /^\d{1,2}:\d{2}(:\d{2})?$/.test(time.trim())) {
+        const timeParts = time.trim().split(":");
+        const hh = timeParts[0].padStart(2, "0");
+        const mm = timeParts[1].padStart(2, "0");
+        const ss = timeParts[2] ? timeParts[2].padStart(2, "0") : "00";
+        eventDateTimeStr = `${dateStr} ${hh}:${mm}:${ss}`;
+    } else {
+        eventDateTimeStr = `${dateStr} 00:00:00`;
+    }
+
     const sql = `
         INSERT INTO EVENTS (
             creator_id, category_id, title, event_date, city, venue, price, capacity, description, image_url, status
         ) VALUES (
-            :creatorId, :categoryId, :title, TO_DATE(:eventDate, 'YYYY-MM-DD'), :city, :venue, :price, :capacity, :description, :imageUrl, :status
+            :creatorId, :categoryId, :title, TO_DATE(:eventDateTime, 'YYYY-MM-DD HH24:MI:SS'), :city, :venue, :price, :capacity, :description, :imageUrl, :status
         ) RETURNING event_id INTO :eventId
     `;
 
@@ -189,7 +206,7 @@ async function createEvent(
         creatorId: creatorId ? Number(creatorId) : null,
         categoryId: resolvedCategoryId,
         title: title.trim(),
-        eventDate: date.trim().split("T")[0], // Normalize to YYYY-MM-DD
+        eventDateTime: eventDateTimeStr,
         city: (city || "Surat").trim(),
         venue: (venue || "Main Auditorium").trim(),
         price: numPrice,

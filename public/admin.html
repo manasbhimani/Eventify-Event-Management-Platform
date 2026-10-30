@@ -18,9 +18,15 @@
 
         <nav class="nav-links">
             <a href="index.html">Explore Events</a>
+            <a href="bookings.html">My Bookings</a>
             <a href="organizer.html">Organizer</a>
-            <a href="login.html">Login</a>
+            <a href="admin.html" class="active">Admin</a>
         </nav>
+
+        <div class="nav-actions">
+            <a class="login-link" href="login.html">Log in</a>
+            <a class="btn btn-primary" href="register.html">Get Started</a>
+        </div>
     </header>
 
     <main class="admin-container">
@@ -34,7 +40,7 @@
                 </p>
             </div>
 
-            <span class="admin-badge">ADMIN DEMO</span>
+            <span class="admin-badge">ADMIN DASHBOARD</span>
         </section>
 
         <section class="admin-stats">
@@ -67,7 +73,7 @@
             <div class="section-heading">
                 <div>
                     <h2>User Management</h2>
-                    <p class="muted">Review registered demo accounts.</p>
+                    <p class="muted">Review registered platform accounts.</p>
                 </div>
 
                 <input
@@ -112,6 +118,42 @@
             <div id="admin-events" class="admin-events"></div>
         </section>
 
+
+        <section class="admin-section" id="admin-bookings-section">
+            <div class="section-heading">
+                <div>
+                    <h2>Booking Management</h2>
+                    <p class="muted">Review and manage platform bookings across all users.</p>
+                </div>
+
+                <select id="admin-booking-filter" aria-label="Filter bookings by status">
+                    <option value="ALL">All Bookings</option>
+                    <option value="CONFIRMED">Confirmed</option>
+                    <option value="CANCELLED">Cancelled</option>
+                </select>
+            </div>
+
+            <p id="admin-booking-message" class="admin-message" role="status" aria-live="polite"></p>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th scope="col">Reference</th>
+                            <th scope="col">Attendee</th>
+                            <th scope="col">Event</th>
+                            <th scope="col">Qty</th>
+                            <th scope="col">Amount</th>
+                            <th scope="col">Event Date</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="admin-bookings-table"></tbody>
+                </table>
+            </div>
+        </section>
+
         <section class="admin-section">
             <div class="section-heading">
                 <div>
@@ -138,8 +180,7 @@
         </section>
 
         <p class="demo-notice">
-            This is a frontend demonstration. No real accounts, permissions,
-            or database records are changed.
+            Connected to live Oracle Database. Statistics, events, and bookings reflect real database records.
         </p>
 
     </main>

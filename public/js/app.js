@@ -96,7 +96,8 @@
 
         const dateP = document.createElement("p");
         dateP.className = "event-date";
-        dateP.textContent = formatDate(event.date);
+        const timePart = event.time ? ` · ${event.time}` : "";
+        dateP.textContent = `${formatDate(event.date)}${timePart}`;
 
         const titleH3 = document.createElement("h3");
         titleH3.textContent = event.title || "Untitled Event";

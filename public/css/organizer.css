@@ -377,3 +377,27 @@
         flex-direction: column;
     }
 }
+
+
+.stat-unavailable {
+    font-size: 16px !important;
+    color: #aaa8c3 !important;
+    font-weight: 600;
+}
+
+.owner-badge {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-weight: 600;
+}
+
+.owner-badge.owned {
+    background: rgba(139, 92, 246, 0.2);
+    color: #c4b5fd;
+}
+
+.owner-badge.catalog {
+    background: rgba(255, 255, 255, 0.06);
+    color: #a1a5bb;
+}
