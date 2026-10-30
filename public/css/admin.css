@@ -103,6 +103,7 @@
 
 #user-search,
 #event-status-filter,
+#admin-booking-filter,
 #category-name {
     min-height: 43px;
     padding: 11px 13px;
@@ -118,10 +119,12 @@
     max-width: 100%;
 }
 
-#user-search:focus,
-#event-status-filter:focus,
-#category-name:focus {
-    outline: none;
+#user-search:focus-visible,
+#event-status-filter:focus-visible,
+#admin-booking-filter:focus-visible,
+#category-name:focus-visible {
+    outline: 2px solid #a78bfa;
+    outline-offset: 2px;
     border-color: #9b7aff;
 }
 
@@ -380,4 +383,36 @@ td {
     .admin-event-top {
         flex-direction: column;
     }
+}
+
+
+.booking-status {
+    display: inline-block;
+    padding: 5px 9px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.booking-status.confirmed {
+    background: rgba(34, 197, 94, 0.13);
+    color: #86efac;
+}
+
+.booking-status.cancelled {
+    background: rgba(239, 68, 68, 0.13);
+    color: #fca5a5;
+}
+
+.table-loading-cell,
+.table-empty-cell {
+    padding: 28px 16px;
+    color: #aaa8c3;
+    text-align: center;
+}
+
+.table-error-cell {
+    padding: 28px 16px;
+    color: #f87171;
+    text-align: center;
 }

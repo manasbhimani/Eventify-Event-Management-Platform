@@ -11,15 +11,85 @@
     const loginForm = document.getElementById("login-form");
     const registerForm = document.getElementById("register-form");
 
-    // Helper: extract query parameters (e.g. ?redirect=/bookings.html)
-    function getRedirectUrl() {
-        const params = new URLSearchParams(window.location.search);
-        const redirect = params.get("redirect");
-        // Ensure redirect is safe (relative URL starting with / or an html file)
-        if (redirect && (redirect.startsWith("/") || redirect.endsWith(".html"))) {
-            return redirect;
+    // Helper: safely extract and validate redirect destination query parameter.
+    // Prevents open redirect attacks (e.g. //attacker.com, /\attacker.com, external domains).
+    // Only allows safe, same-origin relative paths on http: or https:.
+    function getRedirectUrl(customRedirect) {
+        const DEFAULT_REDIRECT = "index.html";
+        try {
+            let redirect = customRedirect;
+            if (redirect === undefined && typeof window !== "undefined" && window.location) {
+                const params = new URLSearchParams(window.location.search);
+                redirect = params.get("redirect");
+            }
+
+            if (!redirect || typeof redirect !== "string") {
+                return DEFAULT_REDIRECT;
+            }
+
+            const trimmed = redirect.trim();
+            if (!trimmed || trimmed === "null" || trimmed === "undefined") {
+                return DEFAULT_REDIRECT;
+            }
+
+            // Decode URL components to block encoded backslash (%5C) or encoded double slash (%2F%2F) bypasses
+            let decoded = trimmed;
+            try {
+                decoded = decodeURIComponent(trimmed);
+            } catch (_) {
+                return DEFAULT_REDIRECT;
+            }
+
+            // Reject backslashes (both literal and decoded)
+            if (trimmed.includes("\\") || decoded.includes("\\")) {
+                return DEFAULT_REDIRECT;
+            }
+
+            // Reject protocol-relative URLs starting with //
+            if (trimmed.startsWith("//") || decoded.startsWith("//")) {
+                return DEFAULT_REDIRECT;
+            }
+
+            // Reject control characters, newlines, or null bytes
+            if (/[\x00-\x1F\x7F]/.test(decoded)) {
+                return DEFAULT_REDIRECT;
+            }
+
+            // Resolve using WHATWG URL API against current origin
+            const currentOrigin = (typeof window !== "undefined" && window.location && window.location.origin)
+                ? window.location.origin
+                : "http://localhost:3000";
+
+            const parsed = new URL(trimmed, currentOrigin);
+
+            // Strict same-origin validation: protocol and host must strictly match
+            if (parsed.origin !== currentOrigin) {
+                return DEFAULT_REDIRECT;
+            }
+
+            // Must use http: or https:
+            if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+                return DEFAULT_REDIRECT;
+            }
+
+            // Pathname must begin with a single slash
+            if (!parsed.pathname.startsWith("/") || parsed.pathname.startsWith("//")) {
+                return DEFAULT_REDIRECT;
+            }
+
+            const relativeTarget = parsed.pathname + parsed.search + parsed.hash;
+            if (relativeTarget === "/" || relativeTarget === "") {
+                return DEFAULT_REDIRECT;
+            }
+
+            return relativeTarget;
+        } catch (_) {
+            return DEFAULT_REDIRECT;
         }
-        return "index.html";
+    }
+
+    if (typeof window !== "undefined") {
+        window.getRedirectUrl = getRedirectUrl;
     }
 
     // Helper: set message text and status color

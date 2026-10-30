@@ -17,6 +17,11 @@
     let liveStats = null;
     let allEvents = [];
     let allCategories = [];
+    let allBookings = [];
+
+    const adminBookingsTableEl = document.getElementById("admin-bookings-table");
+    const adminBookingFilterEl = document.getElementById("admin-booking-filter");
+    const adminBookingMsgEl = document.getElementById("admin-booking-message");
 
     // DOM Elements
     const containerEl = document.querySelector(".admin-container");
@@ -240,7 +245,8 @@
             topDiv.appendChild(statusSpan);
 
             const dateP = document.createElement("p");
-            dateP.textContent = `Date: ${formatEventDate(event.date)}`;
+            const timePart = event.time ? ` at ${event.time}` : "";
+            dateP.textContent = `Date: ${formatEventDate(event.date)}${timePart}`;
 
             const venueCity = event.venue && event.city
                 ? `${event.venue}, ${event.city}`
@@ -297,7 +303,169 @@
         }
     }
 
+
+
     // =======================================================================
+    // ADMIN BOOKING MANAGEMENT (GET /api/bookings & POST /api/bookings/:id/cancel)
+    // =======================================================================
+
+    function renderAdminBookings() {
+        if (!adminBookingsTableEl) return;
+        adminBookingsTableEl.innerHTML = "";
+
+        const selectedStatus = adminBookingFilterEl ? adminBookingFilterEl.value : "ALL";
+
+        const filtered = allBookings.filter(b => {
+            if (selectedStatus === "ALL") return true;
+            return (b.status || "CONFIRMED").toUpperCase() === selectedStatus.toUpperCase();
+        });
+
+        if (filtered.length === 0) {
+            const tr = document.createElement("tr");
+            const td = document.createElement("td");
+            td.colSpan = 8;
+            td.className = "table-empty-cell";
+            td.textContent = (selectedStatus === "ALL")
+                ? "No bookings found in the platform database."
+                : `No bookings match the "${selectedStatus}" status filter.`;
+            tr.appendChild(td);
+            adminBookingsTableEl.appendChild(tr);
+            return;
+        }
+
+        const fragment = document.createDocumentFragment();
+
+        filtered.forEach(booking => {
+            const tr = document.createElement("tr");
+
+            // 1. Reference
+            const refTd = document.createElement("td");
+            const refStrong = document.createElement("strong");
+            refStrong.textContent = escapeText(booking.id);
+            refTd.appendChild(refStrong);
+            tr.appendChild(refTd);
+
+            // 2. Attendee
+            const userTd = document.createElement("td");
+            userTd.textContent = booking.userId ? `User #${booking.userId}` : "Attendee";
+            tr.appendChild(userTd);
+
+            // 3. Event
+            const eventTd = document.createElement("td");
+            eventTd.textContent = escapeText(booking.title || "Untitled Event");
+            tr.appendChild(eventTd);
+
+            // 4. Quantity
+            const qtyTd = document.createElement("td");
+            qtyTd.textContent = Number(booking.quantity || 1).toLocaleString("en-IN");
+            tr.appendChild(qtyTd);
+
+            // 5. Amount
+            const amtTd = document.createElement("td");
+            amtTd.textContent = formatRupees(booking.amount);
+            tr.appendChild(amtTd);
+
+            // 6. Date
+            const dateTd = document.createElement("td");
+            dateTd.textContent = formatEventDate(booking.date);
+            tr.appendChild(dateTd);
+
+            // 7. Status
+            const statusTd = document.createElement("td");
+            const statusSpan = document.createElement("span");
+            const statusLower = (booking.status || "confirmed").toLowerCase();
+            statusSpan.className = `booking-status ${statusLower}`;
+            statusSpan.textContent = escapeText(booking.status || "CONFIRMED");
+            statusTd.appendChild(statusSpan);
+            tr.appendChild(statusTd);
+
+            // 8. Action
+            const actionTd = document.createElement("td");
+            if (booking.status === "CONFIRMED") {
+                const cancelBtn = document.createElement("button");
+                cancelBtn.type = "button";
+                cancelBtn.className = "admin-action danger";
+                cancelBtn.textContent = "Cancel Booking";
+                cancelBtn.setAttribute("aria-label", `Cancel booking ${escapeText(booking.id)}`);
+                cancelBtn.addEventListener("click", () => handleAdminCancelBooking(booking));
+                actionTd.appendChild(cancelBtn);
+            } else {
+                const mutedSpan = document.createElement("span");
+                mutedSpan.className = "muted";
+                mutedSpan.textContent = "—";
+                actionTd.appendChild(mutedSpan);
+            }
+            tr.appendChild(actionTd);
+
+            fragment.appendChild(tr);
+        });
+
+        adminBookingsTableEl.appendChild(fragment);
+    }
+
+    async function handleAdminCancelBooking(booking) {
+        const confirmed = window.confirm(
+            `Are you sure you want to cancel booking ${booking.id} (${booking.title})?\n\nThis will restore ticket capacity and adjust platform revenue.`
+        );
+        if (!confirmed) return;
+
+        if (adminBookingMsgEl) {
+            adminBookingMsgEl.textContent = `Cancelling booking ${booking.id}...`;
+            adminBookingMsgEl.style.color = "#c4b5fd";
+        }
+
+        try {
+            const res = await window.api.cancelBooking(booking.id);
+            if (res && res.success) {
+                if (adminBookingMsgEl) {
+                    adminBookingMsgEl.textContent = `✓ Booking ${booking.id} cancelled successfully.`;
+                    adminBookingMsgEl.style.color = "#4ade80";
+                }
+                // Refresh bookings table and platform statistics
+                await Promise.all([
+                    loadAdminBookings(),
+                    loadAdminStats()
+                ]);
+            } else {
+                throw new Error((res && res.message) || "Cancellation could not be completed.");
+            }
+        } catch (err) {
+            if (adminBookingMsgEl) {
+                adminBookingMsgEl.textContent = `Failed to cancel booking: ${err.message || "Server error"}`;
+                adminBookingMsgEl.style.color = "#f87171";
+            }
+        }
+    }
+
+    async function loadAdminBookings() {
+        if (!adminBookingsTableEl) return;
+        adminBookingsTableEl.innerHTML = "";
+
+        const loadingTr = document.createElement("tr");
+        const loadingTd = document.createElement("td");
+        loadingTd.colSpan = 8;
+        loadingTd.className = "table-loading-cell";
+        loadingTd.textContent = "Loading platform bookings from Oracle...";
+        loadingTr.appendChild(loadingTd);
+        adminBookingsTableEl.appendChild(loadingTr);
+
+        try {
+            const res = await window.api.getBookings();
+            allBookings = (res && Array.isArray(res.data)) ? res.data : [];
+            renderAdminBookings();
+        } catch (err) {
+            adminBookingsTableEl.innerHTML = "";
+            const errTr = document.createElement("tr");
+            const errTd = document.createElement("td");
+            errTd.colSpan = 8;
+            errTd.className = "table-error-cell";
+            errTd.textContent = `Unable to load bookings: ${err.message || "Server error"}`;
+            errTr.appendChild(errTd);
+            adminBookingsTableEl.appendChild(errTr);
+        }
+    }
+
+// =======================================================================
     // CATEGORY MANAGEMENT INTEGRATION (GET /api/categories)
     // =======================================================================
 
@@ -371,6 +539,10 @@
             eventStatusFilter.addEventListener("change", renderAdminEvents);
         }
 
+        if (adminBookingFilterEl) {
+            adminBookingFilterEl.addEventListener("change", renderAdminBookings);
+        }
+
         if (categoryFormEl) {
             categoryFormEl.addEventListener("submit", (e) => {
                 e.preventDefault();
@@ -400,6 +572,7 @@
             await Promise.all([
                 loadAdminStats(),
                 loadAdminEvents(),
+                loadAdminBookings(),
                 loadCategories()
             ]);
             renderUserSectionState();

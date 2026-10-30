@@ -160,7 +160,8 @@
         title.textContent = event.title || "Untitled Event";
 
         const dateCity = document.createElement("p");
-        dateCity.textContent = `${formatEventDate(event.date)} · ${event.city || ""}`;
+        const timePart = event.time ? ` · 🕒 ${event.time}` : "";
+        dateCity.textContent = `${formatEventDate(event.date)}${timePart} · ${event.city || ""}`;
 
         bannerContent.appendChild(eyebrow);
         bannerContent.appendChild(title);
@@ -184,7 +185,8 @@
 
         const capacityNum = Number(event.capacity) || 0;
 
-        facts.appendChild(createFactItem("Date", formatEventDate(event.date)));
+        const dateDisplay = event.time ? `${formatEventDate(event.date)} at ${event.time}` : formatEventDate(event.date);
+        facts.appendChild(createFactItem("Date", dateDisplay));
         facts.appendChild(createFactItem("Location", venueCityText));
         facts.appendChild(createFactItem("Category", event.category || "General"));
         facts.appendChild(createFactItem("Listed capacity", `${capacityNum} tickets`));

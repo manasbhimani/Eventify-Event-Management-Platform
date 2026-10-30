@@ -77,7 +77,7 @@ router.get("/:id", async (req, res, next) => {
 // ---------------------------------------------------------------------------
 router.post("/", requireRole("ORGANIZER", "ADMIN"), csrfProtection, async (req, res, next) => {
     try {
-        const { title, category, categoryId, date, city, venue, price, capacity, description, image, imageUrl } = req.body;
+        const { title, category, categoryId, date, time, city, venue, price, capacity, description, image, imageUrl } = req.body;
 
         if (!title || typeof title !== "string" || title.trim().length < 2) {
             return res.status(400).json({
@@ -106,6 +106,26 @@ router.post("/", requireRole("ORGANIZER", "ADMIN"), csrfProtection, async (req, 
                 success: false,
                 message: "A valid event date in YYYY-MM-DD format is required."
             });
+        }
+
+        let validatedTime = null;
+        if (time !== undefined && time !== null && typeof time === "string" && time.trim() !== "") {
+            const timeTrim = time.trim();
+            if (!/^\d{1,2}:\d{2}$/.test(timeTrim)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Event time must be in HH:mm format (e.g. 18:30)."
+                });
+            }
+            validatedTime = timeTrim;
+        } else if (date.includes("T")) {
+            const parts = date.trim().split("T");
+            if (parts[1]) {
+                const t = parts[1].slice(0, 5);
+                if (/^\d{1,2}:\d{2}$/.test(t)) {
+                    validatedTime = t;
+                }
+            }
         }
 
         const numPrice = Number(price);
@@ -160,6 +180,7 @@ router.post("/", requireRole("ORGANIZER", "ADMIN"), csrfProtection, async (req, 
             title: title.trim(),
             categoryId: resolvedCategoryId,
             date: dateStr,
+            time: validatedTime,
             city: (city && typeof city === "string") ? city.trim() : "Surat",
             venue: (venue && typeof venue === "string") ? venue.trim() : "Main Auditorium",
             price: !isNaN(numPrice) ? numPrice : 0,
