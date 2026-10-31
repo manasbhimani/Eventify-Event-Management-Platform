@@ -25,6 +25,7 @@
     const searchForm = document.getElementById("search-form");
     const resultsCount = document.getElementById("results-count");
     const categoryContainer = document.querySelector(".category-list");
+    const eventsSection = document.getElementById("events");
 
     let selectedCategory = "All";
     let searchDebounceTimer = null;
@@ -73,6 +74,10 @@
     function createEventCard(event) {
         const card = document.createElement("article");
         card.className = "event-card";
+        if (event && event.id != null) {
+            card.id = `event-${event.id}`;
+            card.dataset.eventId = String(event.id);
+        }
 
         // 1. Image container
         const imageDiv = document.createElement("div");
@@ -80,9 +85,12 @@
         imageDiv.setAttribute("role", "img");
         imageDiv.setAttribute("aria-label", event.title || "Event Image");
 
-        const safeImage = sanitizeImageUrl(event.image);
-        if (safeImage) {
-            imageDiv.style.backgroundImage = `url('${safeImage}')`;
+        const imageUrl = typeof window.getEventImageUrl === "function"
+            ? window.getEventImageUrl(event)
+            : sanitizeImageUrl(event.image);
+
+        if (imageUrl) {
+            imageDiv.style.backgroundImage = `url('${imageUrl}')`;
         }
 
         const tagSpan = document.createElement("span");
@@ -237,6 +245,7 @@
 
             if (events.length === 0) {
                 showEmptyState();
+                handleCreatedEventHighlight();
                 return;
             }
 
@@ -250,9 +259,50 @@
             if (resultsCount) {
                 resultsCount.textContent = `${events.length} event${events.length === 1 ? "" : "s"}`;
             }
+
+            handleCreatedEventHighlight();
         } catch (err) {
             console.error("[Events] Failed to load:", err);
             showErrorState(err.message);
+        }
+    }
+
+    /**
+     * Inspect created event query param, scroll to card, highlight temporarily,
+     * and clean query parameter while preserving #events hash.
+     */
+    function handleCreatedEventHighlight() {
+        try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const createdId = urlParams.get("created");
+            if (!createdId) return;
+
+            const card = document.getElementById(`event-${createdId}`) ||
+                         (grid ? grid.querySelector(`[data-event-id="${CSS.escape ? CSS.escape(createdId) : createdId}"]`) : null);
+
+            if (card) {
+                card.scrollIntoView({ behavior: "smooth", block: "center" });
+                card.classList.add("event-card-highlighted");
+                setTimeout(() => {
+                    card.classList.remove("event-card-highlighted");
+                }, 3000);
+            }
+
+            // Clean the created parameter from URL while preserving hash (#events)
+            const cleanUrl = window.location.pathname + (window.location.hash || "#events");
+            window.history.replaceState(null, "", cleanUrl);
+        } catch (err) {
+            console.warn("[Events] Error handling created event highlight:", err);
+        }
+    }
+
+    /**
+     * Smoothly scroll to the #events results section.
+     */
+    function scrollToEventsSection() {
+        const target = eventsSection || document.getElementById("events");
+        if (target) {
+            target.scrollIntoView({ behavior: "smooth", block: "start" });
         }
     }
 
@@ -261,7 +311,7 @@
      * @param {string} categoryName
      * @param {HTMLElement} clickedButton
      */
-    function handleCategoryClick(categoryName, clickedButton) {
+    async function handleCategoryClick(categoryName, clickedButton) {
         selectedCategory = categoryName;
 
         const allButtons = categoryContainer ? categoryContainer.querySelectorAll(".category") : [];
@@ -271,7 +321,8 @@
             btn.setAttribute("aria-pressed", String(isActive));
         });
 
-        loadEvents();
+        await loadEvents();
+        scrollToEventsSection();
     }
 
     /**
@@ -337,10 +388,11 @@
 
     // --- Search input & form listeners ---
     if (searchForm) {
-        searchForm.addEventListener("submit", event => {
+        searchForm.addEventListener("submit", async event => {
             event.preventDefault();
             clearTimeout(searchDebounceTimer);
-            loadEvents();
+            await loadEvents();
+            scrollToEventsSection();
         });
     }
 

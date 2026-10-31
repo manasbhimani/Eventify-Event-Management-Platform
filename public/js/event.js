@@ -145,9 +145,12 @@
         // 1. Banner section
         const banner = document.createElement("section");
         banner.className = "event-banner";
-        const safeImage = sanitizeImageUrl(event.image);
-        if (safeImage) {
-            banner.style.backgroundImage = `url('${safeImage}')`;
+        const imageUrl = typeof window.getEventImageUrl === "function"
+            ? window.getEventImageUrl(event)
+            : sanitizeImageUrl(event.image);
+
+        if (imageUrl) {
+            banner.style.backgroundImage = `url('${imageUrl}')`;
         }
 
         const bannerContent = document.createElement("div");

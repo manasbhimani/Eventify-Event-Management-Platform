@@ -680,11 +680,18 @@
                         if (timeInput) {
                             timeInput.value = "";
                         }
-                        document.getElementById("event-price").value = 199;
-                        document.getElementById("event-capacity").value = 100;
+                        const priceInput = document.getElementById("event-price");
+                        if (priceInput) priceInput.value = 199;
+                        const capInput = document.getElementById("event-capacity");
+                        if (capInput) capInput.value = 100;
 
-                        // Refresh event catalog from server so new event appears
-                        await loadEvents();
+                        if (eventFormSection) {
+                            eventFormSection.hidden = true;
+                        }
+
+                        // Redirect to explore events page highlighting newly created event
+                        const eventId = newEvent.id;
+                        window.location.href = `index.html?created=${encodeURIComponent(eventId)}#events`;
                     } else {
                         throw new Error((response && response.message) || "Event creation could not be confirmed.");
                     }
