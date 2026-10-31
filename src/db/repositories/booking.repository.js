@@ -235,6 +235,16 @@ async function createBookingAtomic({ userId, eventId, quantity }) {
             throw err;
         }
 
+        // Owner self-booking prohibition: organizers receive complimentary entry
+        const creatorId = (eventRow.CREATOR_ID !== null && eventRow.CREATOR_ID !== undefined)
+            ? Number(eventRow.CREATOR_ID)
+            : null;
+        if (creatorId !== null && !isNaN(creatorId) && creatorId === numUserId) {
+            const err = new Error("Event organizers receive complimentary entry and cannot book their own event.");
+            err.code = "OWNER_BOOKING_PROHIBITED";
+            throw err;
+        }
+
         // 2. Check remaining capacity
         const totalBooked = await getConfirmedTicketCountForEvent(tx, eventId);
         const capacity = Number(eventRow.CAPACITY);

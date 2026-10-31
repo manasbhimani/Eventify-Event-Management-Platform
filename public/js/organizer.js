@@ -27,6 +27,42 @@
     const statusFilter = document.getElementById("status-filter");
     const formMessageEl = document.getElementById("event-form-message");
 
+    // Edit Event Modal DOM Elements
+    const editModalBackdrop = document.getElementById("edit-modal-backdrop");
+    const closeEditModalBtn = document.getElementById("close-edit-modal");
+    const cancelEditBtn = document.getElementById("cancel-edit-btn");
+    const editEventForm = document.getElementById("edit-event-form");
+    const editLockedNotice = document.getElementById("edit-locked-notice");
+    const editLockedNoticeText = document.getElementById("edit-locked-notice-text");
+    const editFormMessageEl = document.getElementById("edit-form-message");
+    const saveEditBtn = document.getElementById("save-edit-btn");
+
+    const editEventIdInput = document.getElementById("edit-event-id");
+    const editTitleInput = document.getElementById("edit-event-title");
+    const editCategorySelect = document.getElementById("edit-event-category");
+    const editCityInput = document.getElementById("edit-event-city");
+    const editVenueInput = document.getElementById("edit-event-venue");
+    const editDateInput = document.getElementById("edit-event-date");
+    const editTimeInput = document.getElementById("edit-event-time");
+    const editPriceInput = document.getElementById("edit-event-price");
+    const editCapacityInput = document.getElementById("edit-event-capacity");
+    const editImageInput = document.getElementById("edit-event-image");
+    const editDescriptionInput = document.getElementById("edit-event-description");
+
+    let isSubmittingEdit = false;
+
+    // Cancel Event Modal DOM Elements
+    const cancelModalBackdrop = document.getElementById("cancel-modal-backdrop");
+    const closeCancelModalBtn = document.getElementById("close-cancel-modal");
+    const abortCancelBtn = document.getElementById("abort-cancel-btn");
+    const cancelEventForm = document.getElementById("cancel-event-form");
+    const cancelEventIdInput = document.getElementById("cancel-event-id");
+    const cancelReasonInput = document.getElementById("cancel-event-reason");
+    const cancelFormMessageEl = document.getElementById("cancel-form-message");
+    const confirmCancelBtn = document.getElementById("confirm-cancel-btn");
+
+    let isSubmittingCancel = false;
+
     const statEventsEl = document.getElementById("stat-events");
     const statTicketsEl = document.getElementById("stat-tickets");
     const statRegistrationsEl = document.getElementById("stat-registrations");
@@ -244,6 +280,12 @@
             badgesGroup.style.alignItems = "center";
             badgesGroup.style.gap = "8px";
 
+            // Status Badge
+            const statusSpan = document.createElement("span");
+            const statusLower = (event.status || "published").toLowerCase();
+            statusSpan.className = `event-status ${statusLower}`;
+            statusSpan.textContent = (event.status || "PUBLISHED").toUpperCase();
+
             // Ownership Badge (strictly verifies API creatorId)
             const isOwned = currentUser && event.creatorId && Number(event.creatorId) === Number(currentUser.id);
             const ownerBadge = document.createElement("span");
@@ -295,8 +337,23 @@
             viewLink.className = "event-action";
             viewLink.href = `event.html?id=${encodeURIComponent(event.id)}`;
             viewLink.textContent = "View Public Page →";
-
             actionsDiv.appendChild(viewLink);
+
+            if (isOwned && event.status !== "CANCELLED" && event.status !== "COMPLETED") {
+                const editBtn = document.createElement("button");
+                editBtn.type = "button";
+                editBtn.className = "event-action edit-event-btn";
+                editBtn.textContent = "✏️ Edit Event";
+                editBtn.addEventListener("click", () => openEditModal(event.id));
+                actionsDiv.appendChild(editBtn);
+
+                const cancelBtn = document.createElement("button");
+                cancelBtn.type = "button";
+                cancelBtn.className = "event-action cancel-event-btn";
+                cancelBtn.textContent = "🚫 Cancel Event";
+                cancelBtn.addEventListener("click", () => openCancelModal(event));
+                actionsDiv.appendChild(cancelBtn);
+            }
 
             card.appendChild(topDiv);
             card.appendChild(descEl);
@@ -325,7 +382,7 @@
         organizerEventsEl.appendChild(loadingBox);
 
         try {
-            const res = await window.api.getEvents();
+            const res = await window.api.getEvents({ status: "ALL" });
             allEvents = (res && Array.isArray(res.data)) ? res.data : [];
             updateStatistics();
             renderEvents();
@@ -398,7 +455,122 @@
     }
 
     // =======================================================================
-    // EVENT CREATION FORM HANDLER
+    // EDIT EVENT MODAL
+    // =======================================================================
+
+    async function openEditModal(eventId) {
+        if (!editModalBackdrop) return;
+
+        setMessage(editFormMessageEl, "", false);
+        editEventForm.reset();
+
+        // Populate category dropdown with available categories
+        editCategorySelect.innerHTML = '<option value="" disabled selected>Select a category...</option>';
+        availableCategories.forEach(cat => {
+            const opt = document.createElement("option");
+            opt.value = String(cat.id);
+            opt.textContent = cat.name;
+            editCategorySelect.appendChild(opt);
+        });
+
+        try {
+            const res = await window.api.getEventById(eventId);
+            if (!res || !res.data) {
+                alert("Unable to fetch event details.");
+                return;
+            }
+            const evt = res.data;
+
+            editEventIdInput.value = evt.id;
+            editTitleInput.value = evt.title || "";
+            editCityInput.value = evt.city || "";
+            editVenueInput.value = evt.venue || "";
+            editDateInput.value = evt.date ? evt.date.split("T")[0] : "";
+            editTimeInput.value = evt.time || "";
+            editPriceInput.value = (evt.price !== undefined && evt.price !== null) ? evt.price : 0;
+            editCapacityInput.value = evt.capacity || 100;
+            editImageInput.value = (evt.image && evt.image !== "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=800&q=80") ? evt.image : "";
+            editDescriptionInput.value = evt.description || "";
+
+            // Match category
+            if (evt.categoryId) {
+                editCategorySelect.value = String(evt.categoryId);
+            } else if (evt.category) {
+                const matched = availableCategories.find(c => c.name.toLowerCase() === evt.category.toLowerCase());
+                if (matched) editCategorySelect.value = String(matched.id);
+            }
+
+            // Authoritative booked tickets check & locked fields
+            const bookedCount = Number(evt.bookedCount || 0);
+            if (bookedCount > 0) {
+                editLockedNotice.removeAttribute("hidden");
+                editLockedNoticeText.textContent = `This event has ${bookedCount} confirmed booked ticket${bookedCount === 1 ? "" : "s"}. To protect existing attendee bookings, the event title and ticket price cannot be changed.`;
+                editTitleInput.disabled = true;
+                editTitleInput.classList.add("input-locked");
+                editPriceInput.disabled = true;
+                editPriceInput.classList.add("input-locked");
+                editCapacityInput.min = String(bookedCount);
+            } else {
+                editLockedNotice.setAttribute("hidden", "");
+                editTitleInput.disabled = false;
+                editTitleInput.classList.remove("input-locked");
+                editPriceInput.disabled = false;
+                editPriceInput.classList.remove("input-locked");
+                editCapacityInput.min = "1";
+            }
+
+            editModalBackdrop.removeAttribute("hidden");
+            // Set focus to the first editable input
+            if (!editTitleInput.disabled) {
+                editTitleInput.focus();
+            } else {
+                editDateInput.focus();
+            }
+        } catch (err) {
+            alert("Error loading event for editing: " + (err.message || "Network error"));
+        }
+    }
+
+    function closeEditModal() {
+        if (!editModalBackdrop) return;
+        editModalBackdrop.setAttribute("hidden", "");
+        setMessage(editFormMessageEl, "", false);
+        isSubmittingEdit = false;
+        if (saveEditBtn) {
+            saveEditBtn.disabled = false;
+            saveEditBtn.textContent = "Save Changes";
+        }
+    }
+
+    // =======================================================================
+    // CANCEL EVENT MODAL
+    // =======================================================================
+
+    function openCancelModal(event) {
+        if (!cancelModalBackdrop || !event) return;
+        cancelEventIdInput.value = event.id;
+        cancelReasonInput.value = "";
+        setMessage(cancelFormMessageEl, "", false);
+        cancelModalBackdrop.removeAttribute("hidden");
+        cancelReasonInput.focus();
+    }
+
+    function closeCancelModal() {
+        if (!cancelModalBackdrop) return;
+        cancelModalBackdrop.setAttribute("hidden", "");
+        setMessage(cancelFormMessageEl, "", false);
+        isSubmittingCancel = false;
+        if (confirmCancelBtn) {
+            confirmCancelBtn.disabled = false;
+            confirmCancelBtn.textContent = "Yes, Cancel Event";
+        }
+        if (abortCancelBtn) {
+            abortCancelBtn.disabled = false;
+        }
+    }
+
+    // =======================================================================
+    // EVENT CREATION & EDITING FORM HANDLERS
     // =======================================================================
 
     function initFormHandlers() {
@@ -536,6 +708,190 @@
 
         if (statusFilter) {
             statusFilter.addEventListener("change", renderEvents);
+        }
+
+        // Edit Modal Controls & Listeners
+        if (closeEditModalBtn) {
+            closeEditModalBtn.addEventListener("click", closeEditModal);
+        }
+        if (cancelEditBtn) {
+            cancelEditBtn.addEventListener("click", closeEditModal);
+        }
+        if (editModalBackdrop) {
+            editModalBackdrop.addEventListener("click", (e) => {
+                if (e.target === editModalBackdrop) {
+                    closeEditModal();
+                }
+            });
+        }
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") {
+                if (editModalBackdrop && !editModalBackdrop.hasAttribute("hidden")) {
+                    closeEditModal();
+                }
+                if (cancelModalBackdrop && !cancelModalBackdrop.hasAttribute("hidden")) {
+                    closeCancelModal();
+                }
+            }
+        });
+
+        if (editEventForm) {
+            editEventForm.addEventListener("submit", async (e) => {
+                e.preventDefault();
+                if (isSubmittingEdit) return;
+
+                const eventId = editEventIdInput.value;
+                if (!eventId) return;
+
+                const titleVal = editTitleInput.value.trim();
+                if (!editTitleInput.disabled && titleVal.length < 2) {
+                    setMessage(editFormMessageEl, "Event title must be at least 2 characters.", true);
+                    return;
+                }
+
+                const catVal = editCategorySelect.value;
+                if (!catVal) {
+                    setMessage(editFormMessageEl, "Please select an event category.", true);
+                    return;
+                }
+
+                const dateVal = editDateInput.value;
+                if (!dateVal) {
+                    setMessage(editFormMessageEl, "Please provide a valid event date.", true);
+                    return;
+                }
+
+                const priceNum = Number(editPriceInput.value);
+                if (!editPriceInput.disabled && (isNaN(priceNum) || priceNum < 0)) {
+                    setMessage(editFormMessageEl, "Ticket price must be 0 or greater.", true);
+                    return;
+                }
+
+                const capacityNum = Number(editCapacityInput.value);
+                const minCap = Number(editCapacityInput.min || 1);
+                if (isNaN(capacityNum) || capacityNum < minCap) {
+                    setMessage(editFormMessageEl, `Capacity must be at least ${minCap}.`, true);
+                    return;
+                }
+
+                isSubmittingEdit = true;
+                if (saveEditBtn) {
+                    saveEditBtn.disabled = true;
+                    saveEditBtn.textContent = "Saving...";
+                }
+                setMessage(editFormMessageEl, "Saving changes to Oracle Database...", false);
+
+                const payload = {
+                    title: titleVal,
+                    categoryId: Number(catVal),
+                    city: editCityInput.value.trim() || "Surat",
+                    venue: editVenueInput.value.trim() || "Main Auditorium",
+                    date: dateVal,
+                    time: editTimeInput.value.trim() || null,
+                    price: priceNum,
+                    capacity: capacityNum,
+                    description: editDescriptionInput.value.trim(),
+                    imageUrl: editImageInput.value.trim() || undefined
+                };
+
+                try {
+                    const response = await window.api.updateEvent(eventId, payload);
+                    if (response && response.success) {
+                        setMessage(editFormMessageEl, "✓ Event updated successfully!", false);
+                        setTimeout(async () => {
+                            closeEditModal();
+                            await loadEvents();
+                        }, 400);
+                    } else {
+                        throw new Error((response && response.message) || "Update failed.");
+                    }
+                } catch (err) {
+                    let errMsg = err.message || "Failed to save event changes.";
+                    if (err.status === 401) {
+                        errMsg = "Your session has expired. Please log in again.";
+                    } else if (err.status === 403) {
+                        errMsg = "Access denied: You are not authorized to edit this event.";
+                    }
+                    setMessage(editFormMessageEl, errMsg, true);
+                    if (saveEditBtn) {
+                        saveEditBtn.disabled = false;
+                        saveEditBtn.textContent = "Save Changes";
+                    }
+                    isSubmittingEdit = false;
+                }
+            });
+        }
+
+        // Cancel Modal Controls & Listeners
+        if (closeCancelModalBtn) {
+            closeCancelModalBtn.addEventListener("click", closeCancelModal);
+        }
+        if (abortCancelBtn) {
+            abortCancelBtn.addEventListener("click", closeCancelModal);
+        }
+        if (cancelModalBackdrop) {
+            cancelModalBackdrop.addEventListener("click", (e) => {
+                if (e.target === cancelModalBackdrop) {
+                    closeCancelModal();
+                }
+            });
+        }
+
+        if (cancelEventForm) {
+            cancelEventForm.addEventListener("submit", async (e) => {
+                e.preventDefault();
+                if (isSubmittingCancel) return;
+
+                const eventId = cancelEventIdInput.value;
+                if (!eventId) return;
+
+                const reason = cancelReasonInput.value.trim();
+                if (reason.length > 500) {
+                    setMessage(cancelFormMessageEl, "Cancellation reason cannot exceed 500 characters.", true);
+                    return;
+                }
+
+                isSubmittingCancel = true;
+                if (confirmCancelBtn) {
+                    confirmCancelBtn.disabled = true;
+                    confirmCancelBtn.textContent = "Cancelling event...";
+                }
+                if (abortCancelBtn) {
+                    abortCancelBtn.disabled = true;
+                }
+                setMessage(cancelFormMessageEl, "Processing event cancellation and attendee notifications...", false);
+
+                try {
+                    const response = await window.api.cancelEvent(eventId, { reason });
+                    if (response && response.success) {
+                        setMessage(cancelFormMessageEl, "✓ Event cancelled successfully.", false);
+                        setTimeout(async () => {
+                            closeCancelModal();
+                            await loadEvents();
+                        }, 400);
+                    } else {
+                        throw new Error((response && response.message) || "Failed to cancel event.");
+                    }
+                } catch (err) {
+                    let errMsg = err.message || "Failed to cancel event.";
+                    if (err.status === 401) {
+                        errMsg = "Your session has expired. Please log in again.";
+                    } else if (err.status === 403) {
+                        errMsg = "Access denied: You are not authorized to cancel this event.";
+                    } else if (err.status === 404) {
+                        errMsg = "Event not found or already removed.";
+                    }
+                    setMessage(cancelFormMessageEl, errMsg, true);
+                    if (confirmCancelBtn) {
+                        confirmCancelBtn.disabled = false;
+                        confirmCancelBtn.textContent = "Yes, Cancel Event";
+                    }
+                    if (abortCancelBtn) {
+                        abortCancelBtn.disabled = false;
+                    }
+                    isSubmittingCancel = false;
+                }
+            });
         }
     }
 

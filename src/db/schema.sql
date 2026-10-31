@@ -1,6 +1,6 @@
 -- ============================================================================
 -- EVENTIFY RELATIONAL SCHEMA (ORACLE DATABASE 23ai)
--- Target Schema: eventify_admin | PDB: FREEPDB1 | Version: 1.0.0
+-- Target Schema: eventify_admin | PDB: FREEPDB1 | Version: 1.1.0
 -- ============================================================================
 
 -- 0. SCHEMA MIGRATION TRACKING
@@ -60,6 +60,9 @@ CREATE TABLE EVENTS (
     description      VARCHAR2(4000)       NULL,
     image_url        VARCHAR2(500)        DEFAULT 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=800&q=80' NOT NULL,
     status           VARCHAR2(20)         DEFAULT 'PUBLISHED' NOT NULL,
+    cancelled_by     NUMBER               NULL,
+    cancelled_at     TIMESTAMP WITH TIME ZONE NULL,
+    cancellation_reason VARCHAR2(500)     NULL,
     created_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
 
@@ -68,6 +71,8 @@ CREATE TABLE EVENTS (
         REFERENCES USERS (user_id) ON DELETE SET NULL,
     CONSTRAINT fk_events_category FOREIGN KEY (category_id)
         REFERENCES CATEGORIES (category_id),
+    CONSTRAINT fk_events_cancelled_by FOREIGN KEY (cancelled_by)
+        REFERENCES USERS (user_id) ON DELETE SET NULL,
     CONSTRAINT chk_events_price CHECK (price >= 0),
     CONSTRAINT chk_events_capacity CHECK (capacity > 0),
     CONSTRAINT chk_events_status CHECK (status IN ('DRAFT', 'PUBLISHED', 'CANCELLED', 'COMPLETED'))
@@ -77,6 +82,7 @@ CREATE INDEX idx_events_category ON EVENTS (category_id);
 CREATE INDEX idx_events_creator ON EVENTS (creator_id);
 CREATE INDEX idx_events_status_date ON EVENTS (status, event_date);
 CREATE INDEX idx_events_city ON EVENTS (city);
+CREATE INDEX idx_events_cancelled_by ON EVENTS (cancelled_by);
 
 -- 4. BOOKINGS TABLE & SEQUENCE
 CREATE SEQUENCE seq_booking_id START WITH 2001 INCREMENT BY 1 NOCACHE;
@@ -128,3 +134,60 @@ CREATE TABLE SESSIONS (
 
 CREATE INDEX idx_sessions_user ON SESSIONS (user_id);
 CREATE INDEX idx_sessions_expires ON SESSIONS (expires_at);
+
+-- 6. NOTIFICATIONS TABLE
+CREATE TABLE NOTIFICATIONS (
+    notification_id       NUMBER GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    user_id               NUMBER                           NOT NULL,
+    event_id              NUMBER                           NOT NULL,
+    booking_id            VARCHAR2(30)                     NULL,
+    type                  VARCHAR2(30) DEFAULT 'EVENT_CANCELLED' NOT NULL,
+    title                 VARCHAR2(200)                    NOT NULL,
+    message               VARCHAR2(1000)                   NOT NULL,
+    status                VARCHAR2(20) DEFAULT 'UNREAD'    NOT NULL,
+    created_at            TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    read_at               TIMESTAMP WITH TIME ZONE         NULL,
+
+    CONSTRAINT pk_notifications PRIMARY KEY (notification_id),
+    CONSTRAINT fk_notif_user FOREIGN KEY (user_id) REFERENCES USERS (user_id) ON DELETE CASCADE,
+    CONSTRAINT fk_notif_event FOREIGN KEY (event_id) REFERENCES EVENTS (event_id),
+    CONSTRAINT fk_notif_booking FOREIGN KEY (booking_id) REFERENCES BOOKINGS (booking_id) ON DELETE SET NULL,
+    CONSTRAINT chk_notif_status CHECK (status IN ('UNREAD', 'READ', 'DISMISSED')),
+    CONSTRAINT chk_notif_type CHECK (type IN ('EVENT_CANCELLED', 'EVENT_UPDATED', 'GENERAL')),
+    CONSTRAINT uq_notif_booking_type UNIQUE (user_id, booking_id, type)
+);
+
+CREATE INDEX idx_notif_user_status ON NOTIFICATIONS (user_id, status);
+CREATE INDEX idx_notif_event ON NOTIFICATIONS (event_id);
+CREATE INDEX idx_notif_booking ON NOTIFICATIONS (booking_id);
+
+-- 7. EVENT_REFUNDS TABLE
+-- NOTE ON PAYMENT & REFUNDS:
+-- Eventify currently operates without external payment gateway integration.
+-- Zero actual money is processed. EVENT_REFUNDS stores simulated development
+-- refund records for accounting and audit reconciliation upon paid booking cancellation.
+CREATE TABLE EVENT_REFUNDS (
+    refund_id             NUMBER GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    booking_id            VARCHAR2(30)                     NOT NULL,
+    event_id              NUMBER                           NOT NULL,
+    user_id               NUMBER                           NOT NULL,
+    refund_amount         NUMBER(12, 2)                    NOT NULL,
+    refund_mode           VARCHAR2(30) DEFAULT 'SIMULATED' NOT NULL,
+    status                VARCHAR2(30) DEFAULT 'SIMULATED_RECORDED' NOT NULL,
+    reason                VARCHAR2(500) DEFAULT 'Event cancelled by organizer' NOT NULL,
+    created_at            TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at            TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+
+    CONSTRAINT pk_event_refunds PRIMARY KEY (refund_id),
+    CONSTRAINT uq_refunds_booking UNIQUE (booking_id),
+    CONSTRAINT fk_refunds_booking FOREIGN KEY (booking_id) REFERENCES BOOKINGS (booking_id),
+    CONSTRAINT fk_refunds_event FOREIGN KEY (event_id) REFERENCES EVENTS (event_id),
+    CONSTRAINT fk_refunds_user FOREIGN KEY (user_id) REFERENCES USERS (user_id),
+    CONSTRAINT chk_refunds_amount CHECK (refund_amount > 0),
+    CONSTRAINT chk_refunds_mode CHECK (refund_mode IN ('SIMULATED', 'NO_PAYMENT_GATEWAY')),
+    CONSTRAINT chk_refunds_status CHECK (status IN ('SIMULATED_RECORDED', 'SIMULATED_PROCESSED', 'SIMULATED_VOID'))
+);
+
+CREATE INDEX idx_refunds_event ON EVENT_REFUNDS (event_id);
+CREATE INDEX idx_refunds_user ON EVENT_REFUNDS (user_id);
+CREATE INDEX idx_refunds_status ON EVENT_REFUNDS (status);

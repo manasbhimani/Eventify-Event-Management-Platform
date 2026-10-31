@@ -183,6 +183,9 @@
             if (params.search && params.search.trim()) {
                 query.set("search", params.search.trim());
             }
+            if (params.status) {
+                query.set("status", params.status);
+            }
             const qs = query.toString();
             return request(`/events${qs ? "?" + qs : ""}`);
         },
@@ -205,6 +208,32 @@
             return request("/events", {
                 method: "POST",
                 body: JSON.stringify(eventData)
+            });
+        },
+
+        /**
+         * Update an existing event (ORGANIZER or ADMIN).
+         * @param {number|string} id
+         * @param {Object} eventData
+         * @returns {Promise<{success: boolean, message: string, data: Object}>}
+         */
+        updateEvent(id, eventData) {
+            return request(`/events/${encodeURIComponent(id)}`, {
+                method: "PUT",
+                body: JSON.stringify(eventData)
+            });
+        },
+
+        /**
+         * Cancel an event, notify attendees, and record simulated refunds (ORGANIZER or ADMIN).
+         * @param {number|string} id
+         * @param {Object} [options] - { reason }
+         * @returns {Promise<{success: boolean, message: string, data: Object}>}
+         */
+        cancelEvent(id, options = {}) {
+            return request(`/events/${encodeURIComponent(id)}/cancel`, {
+                method: "POST",
+                body: JSON.stringify(options)
             });
         },
 
@@ -248,6 +277,33 @@
          */
         cancelBooking(bookingId) {
             return request(`/bookings/${encodeURIComponent(bookingId)}/cancel`, {
+                method: "POST"
+            });
+        },
+
+        // --- NOTIFICATIONS ---
+
+        /**
+         * Fetch notifications for current user.
+         * @param {Object} [params] - { status }
+         * @returns {Promise<{success: boolean, count: number, data: Array}>}
+         */
+        getNotifications(params = {}) {
+            const query = new URLSearchParams();
+            if (params.status) {
+                query.set("status", params.status);
+            }
+            const qs = query.toString();
+            return request(`/notifications${qs ? "?" + qs : ""}`);
+        },
+
+        /**
+         * Dismiss a notification by ID.
+         * @param {number|string} id
+         * @returns {Promise<{success: boolean, message: string, data: Object}>}
+         */
+        dismissNotification(id) {
+            return request(`/notifications/${encodeURIComponent(id)}/dismiss`, {
                 method: "POST"
             });
         },

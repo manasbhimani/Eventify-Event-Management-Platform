@@ -352,9 +352,18 @@ async function verifySeededData(connection) {
         audit.errors.push(`Found bookings violating amount = unit_price * quantity: ${invalidAmounts.rows.length}`);
     }
 
-    // 4. Sequence Range Verification (No bookings >= 2001)
+    // 4. Sequence Range Verification (Seed bookings must be < 2001)
+    const seedBookingIds = seedBookings.map(b => b.id);
+    const inBinds = {};
+    const inPlaceholders = seedBookingIds.map((id, idx) => {
+        const key = `bId${idx}`;
+        inBinds[key] = id;
+        return `:${key}`;
+    }).join(", ");
+
     const rangeViolations = await connection.execute(
-        `SELECT booking_id FROM BOOKINGS WHERE TO_NUMBER(SUBSTR(booking_id, 5)) >= 2001`
+        `SELECT booking_id FROM BOOKINGS WHERE booking_id IN (${inPlaceholders}) AND TO_NUMBER(SUBSTR(booking_id, 5)) >= 2001`,
+        inBinds
     );
     if (rangeViolations.rows && rangeViolations.rows.length > 0) {
         audit.allValid = false;

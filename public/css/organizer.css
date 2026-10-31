@@ -401,3 +401,172 @@
     background: rgba(255, 255, 255, 0.06);
     color: #a1a5bb;
 }
+
+.font-normal {
+    font-size: 12px;
+    font-weight: normal;
+}
+
+/* Edit Event Modal & Locked Fields Styling */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 8, 16, 0.85);
+    backdrop-filter: blur(6px);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    overflow-y: auto;
+}
+
+.modal-backdrop[hidden] {
+    display: none;
+}
+
+.modal-dialog {
+    background: #151526;
+    border: 1px solid #393052;
+    border-radius: 18px;
+    padding: 28px;
+    width: 100%;
+    max-width: 760px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+}
+
+.locked-fields-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px;
+    margin-bottom: 22px;
+    border-radius: 12px;
+    background: rgba(168, 85, 247, 0.12);
+    border: 1px solid rgba(168, 85, 247, 0.35);
+}
+
+.locked-fields-notice[hidden] {
+    display: none;
+}
+
+.notice-icon {
+    font-size: 22px;
+    line-height: 1;
+}
+
+.notice-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #c084fc;
+    margin-bottom: 4px;
+}
+
+.notice-body {
+    font-size: 13px;
+    line-height: 1.5;
+    color: #dedced;
+    margin: 0;
+}
+
+.input-locked,
+input:disabled.input-locked {
+    background: #1c1b2f !important;
+    border-color: #3b3658 !important;
+    color: #8b88a8 !important;
+    cursor: not-allowed !important;
+    opacity: 0.85;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 12px;
+    margin-top: 24px;
+    padding-top: 18px;
+    border-top: 1px solid #292840;
+}
+
+.cancel-button {
+    padding: 13px 20px;
+    border: 1px solid #3e3b5c;
+    border-radius: 10px;
+    background: transparent;
+    color: #dedced;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.cancel-button:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: #55507a;
+}
+
+.edit-event-btn {
+    color: #c084fc;
+    border-color: rgba(168, 85, 247, 0.4);
+}
+
+.edit-event-btn:hover {
+    background: rgba(168, 85, 247, 0.15);
+    border-color: #a855f7;
+}
+
+.modal-dialog-sm {
+    max-width: 580px;
+}
+
+.cancel-warning-box {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px;
+    margin-bottom: 22px;
+    border-radius: 12px;
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.warning-icon {
+    font-size: 24px;
+    line-height: 1;
+}
+
+.warning-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #fca5a5;
+    margin-bottom: 4px;
+}
+
+.warning-body {
+    font-size: 13px;
+    line-height: 1.5;
+    color: #dedced;
+    margin: 0;
+}
+
+.danger-button {
+    background: #dc2626 !important;
+    color: #fff !important;
+    border-color: #ef4444 !important;
+}
+
+.danger-button:hover {
+    background: #b91c1c !important;
+}
+
+.cancel-event-btn {
+    color: #fca5a5;
+    border-color: rgba(239, 68, 68, 0.4);
+}
+
+.cancel-event-btn:hover {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: #ef4444;
+}
