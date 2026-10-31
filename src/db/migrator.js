@@ -3,7 +3,9 @@
  *
  * Eventify — Oracle Database Migration Engine.
  *
- * Implements the approved Phase 8C schema design for Oracle Database 23ai Free.
+ * Supports multi-version forward-only migrations for Oracle Database 23ai Free.
+ *   - Version 1 (1.0.0): Initial Relational Core Schema (Users, Categories, Events, Bookings, Sessions)
+ *   - Version 2 (1.1.0): Event Cancellation Audit, Persistent Notifications, Simulated Refunds
  *
  * Responsibilities:
  *   1. Safely bootstrap and validate the SCHEMA_VERSION tracker table.
@@ -18,12 +20,20 @@
 
 const oracledb = require("oracledb");
 
-const SCHEMA_VERSION_ID = 1;
-const SCHEMA_VERSION_LABEL = "1.0.0";
-const MIGRATION_CHECKSUM = "phase9a-v1.0.0-final-approved";
+const SCHEMA_VERSION_1_ID = 1;
+const SCHEMA_VERSION_1_LABEL = "1.0.0";
+const MIGRATION_1_CHECKSUM = "phase9a-v1.0.0-final-approved";
+
+const SCHEMA_VERSION_2_ID = 2;
+const SCHEMA_VERSION_2_LABEL = "1.1.0";
+const MIGRATION_2_CHECKSUM = "phase11-v1.1.0-cancellation-notifications-refunds";
+
+// Current target schema version
+const CURRENT_SCHEMA_VERSION_ID = SCHEMA_VERSION_2_ID;
+const CURRENT_SCHEMA_VERSION_LABEL = SCHEMA_VERSION_2_LABEL;
 
 // ---------------------------------------------------------------------------
-// Approved Schema Inventory Specification
+// Cumulative Approved Schema Inventory Specification (v1.1.0)
 // ---------------------------------------------------------------------------
 
 const EXPECTED_TABLES = [
@@ -32,7 +42,9 @@ const EXPECTED_TABLES = [
     "CATEGORIES",
     "EVENTS",
     "BOOKINGS",
-    "SESSIONS"
+    "SESSIONS",
+    "NOTIFICATIONS",
+    "EVENT_REFUNDS"
 ];
 
 const EXPECTED_SEQUENCES = [
@@ -51,7 +63,9 @@ const EXPECTED_PRIMARY_KEYS = [
     { name: "PK_CATEGORIES", table: "CATEGORIES", column: "CATEGORY_ID" },
     { name: "PK_EVENTS", table: "EVENTS", column: "EVENT_ID" },
     { name: "PK_BOOKINGS", table: "BOOKINGS", column: "BOOKING_ID" },
-    { name: "PK_SESSIONS", table: "SESSIONS", column: "SESSION_TOKEN_HASH" }
+    { name: "PK_SESSIONS", table: "SESSIONS", column: "SESSION_TOKEN_HASH" },
+    { name: "PK_NOTIFICATIONS", table: "NOTIFICATIONS", column: "NOTIFICATION_ID" },
+    { name: "PK_EVENT_REFUNDS", table: "EVENT_REFUNDS", column: "REFUND_ID" }
 ];
 
 const EXPECTED_FOREIGN_KEYS = [
@@ -94,12 +108,72 @@ const EXPECTED_FOREIGN_KEYS = [
         refTable: "USERS",
         refColumn: "USER_ID",
         deleteRule: "CASCADE"
+    },
+    // v1.1.0 additions
+    {
+        name: "FK_EVENTS_CANCELLED_BY",
+        table: "EVENTS",
+        column: "CANCELLED_BY",
+        refTable: "USERS",
+        refColumn: "USER_ID",
+        deleteRule: "SET NULL"
+    },
+    {
+        name: "FK_NOTIF_USER",
+        table: "NOTIFICATIONS",
+        column: "USER_ID",
+        refTable: "USERS",
+        refColumn: "USER_ID",
+        deleteRule: "CASCADE"
+    },
+    {
+        name: "FK_NOTIF_EVENT",
+        table: "NOTIFICATIONS",
+        column: "EVENT_ID",
+        refTable: "EVENTS",
+        refColumn: "EVENT_ID",
+        deleteRule: "NO ACTION"
+    },
+    {
+        name: "FK_NOTIF_BOOKING",
+        table: "NOTIFICATIONS",
+        column: "BOOKING_ID",
+        refTable: "BOOKINGS",
+        refColumn: "BOOKING_ID",
+        deleteRule: "SET NULL"
+    },
+    {
+        name: "FK_REFUNDS_BOOKING",
+        table: "EVENT_REFUNDS",
+        column: "BOOKING_ID",
+        refTable: "BOOKINGS",
+        refColumn: "BOOKING_ID",
+        deleteRule: "NO ACTION"
+    },
+    {
+        name: "FK_REFUNDS_EVENT",
+        table: "EVENT_REFUNDS",
+        column: "EVENT_ID",
+        refTable: "EVENTS",
+        refColumn: "EVENT_ID",
+        deleteRule: "NO ACTION"
+    },
+    {
+        name: "FK_REFUNDS_USER",
+        table: "EVENT_REFUNDS",
+        column: "USER_ID",
+        refTable: "USERS",
+        refColumn: "USER_ID",
+        deleteRule: "NO ACTION"
     }
 ];
 
 const EXPECTED_UNIQUE_CONSTRAINTS = [
     { name: "UQ_USERS_EMAIL", table: "USERS", column: "EMAIL" },
-    { name: "UQ_CATEGORIES_NAME", table: "CATEGORIES", column: "NAME" }
+    { name: "UQ_CATEGORIES_NAME", table: "CATEGORIES", column: "NAME" },
+    // v1.1.0 additions
+    { name: "UQ_NOTIF_BOOKING_TYPE", table: "NOTIFICATIONS" },
+    { name: "UQ_REFUNDS_BOOKING", table: "EVENT_REFUNDS", column: "BOOKING_ID" }
 ];
 
 const EXPECTED_CHECK_CONSTRAINTS = [
@@ -116,7 +190,13 @@ const EXPECTED_CHECK_CONSTRAINTS = [
     { name: "CHK_BOOKINGS_UNIT_PRICE", table: "BOOKINGS" },
     { name: "CHK_BOOKINGS_AMOUNT", table: "BOOKINGS" },
     { name: "CHK_BOOKINGS_AMOUNT_CALC", table: "BOOKINGS" },
-    { name: "CHK_BOOKINGS_STATUS", table: "BOOKINGS" }
+    { name: "CHK_BOOKINGS_STATUS", table: "BOOKINGS" },
+    // v1.1.0 additions
+    { name: "CHK_NOTIF_STATUS", table: "NOTIFICATIONS" },
+    { name: "CHK_NOTIF_TYPE", table: "NOTIFICATIONS" },
+    { name: "CHK_REFUNDS_AMOUNT", table: "EVENT_REFUNDS" },
+    { name: "CHK_REFUNDS_MODE", table: "EVENT_REFUNDS" },
+    { name: "CHK_REFUNDS_STATUS", table: "EVENT_REFUNDS" }
 ];
 
 const EXPECTED_SECONDARY_INDEXES = [
@@ -128,14 +208,28 @@ const EXPECTED_SECONDARY_INDEXES = [
     { name: "IDX_BOOKINGS_EVENT_STATUS", table: "BOOKINGS", columns: ["EVENT_ID", "STATUS"] },
     { name: "IDX_BOOKINGS_DATE", table: "BOOKINGS", columns: ["BOOKING_DATE"] },
     { name: "IDX_SESSIONS_USER", table: "SESSIONS", columns: ["USER_ID"] },
-    { name: "IDX_SESSIONS_EXPIRES", table: "SESSIONS", columns: ["EXPIRES_AT"] }
+    { name: "IDX_SESSIONS_EXPIRES", table: "SESSIONS", columns: ["EXPIRES_AT"] },
+    // v1.1.0 additions
+    { name: "IDX_EVENTS_CANCELLED_BY", table: "EVENTS", columns: ["CANCELLED_BY"] },
+    { name: "IDX_NOTIF_USER_STATUS", table: "NOTIFICATIONS", columns: ["USER_ID", "STATUS"] },
+    { name: "IDX_NOTIF_EVENT", table: "NOTIFICATIONS", columns: ["EVENT_ID"] },
+    { name: "IDX_NOTIF_BOOKING", table: "NOTIFICATIONS", columns: ["BOOKING_ID"] },
+    { name: "IDX_REFUNDS_EVENT", table: "EVENT_REFUNDS", columns: ["EVENT_ID"] },
+    { name: "IDX_REFUNDS_USER", table: "EVENT_REFUNDS", columns: ["USER_ID"] },
+    { name: "IDX_REFUNDS_STATUS", table: "EVENT_REFUNDS", columns: ["STATUS"] }
+];
+
+const EXPECTED_EVENTS_AUDIT_COLUMNS = [
+    "CANCELLED_BY",
+    "CANCELLED_AT",
+    "CANCELLATION_REASON"
 ];
 
 // ---------------------------------------------------------------------------
-// DDL Step Definitions
+// DDL Step Definitions — Version 1 (1.0.0)
 // ---------------------------------------------------------------------------
 
-const DDL_STEPS = [
+const DDL_STEPS_V1 = [
     {
         type: "TABLE",
         name: "USERS",
@@ -264,7 +358,6 @@ const DDL_STEPS = [
             )
         `
     },
-    // Secondary Indexes
     { type: "INDEX", name: "IDX_EVENTS_CATEGORY", sql: `CREATE INDEX idx_events_category ON EVENTS (category_id)` },
     { type: "INDEX", name: "IDX_EVENTS_CREATOR", sql: `CREATE INDEX idx_events_creator ON EVENTS (creator_id)` },
     { type: "INDEX", name: "IDX_EVENTS_STATUS_DATE", sql: `CREATE INDEX idx_events_status_date ON EVENTS (status, event_date)` },
@@ -274,6 +367,97 @@ const DDL_STEPS = [
     { type: "INDEX", name: "IDX_BOOKINGS_DATE", sql: `CREATE INDEX idx_bookings_date ON BOOKINGS (booking_date)` },
     { type: "INDEX", name: "IDX_SESSIONS_USER", sql: `CREATE INDEX idx_sessions_user ON SESSIONS (user_id)` },
     { type: "INDEX", name: "IDX_SESSIONS_EXPIRES", sql: `CREATE INDEX idx_sessions_expires ON SESSIONS (expires_at)` }
+];
+
+// ---------------------------------------------------------------------------
+// DDL Step Definitions — Version 2 (1.1.0)
+// ---------------------------------------------------------------------------
+
+const DDL_STEPS_V2 = [
+    // 1. Audit columns on EVENTS
+    {
+        type: "COLUMN_GROUP",
+        table: "EVENTS",
+        name: "CANCELLED_BY", // Anchor column to test existence
+        sql: `ALTER TABLE EVENTS ADD (
+            cancelled_by          NUMBER                           NULL,
+            cancelled_at          TIMESTAMP WITH TIME ZONE         NULL,
+            cancellation_reason   VARCHAR2(500)                    NULL
+        )`
+    },
+    {
+        type: "CONSTRAINT",
+        table: "EVENTS",
+        name: "FK_EVENTS_CANCELLED_BY",
+        sql: `ALTER TABLE EVENTS ADD CONSTRAINT fk_events_cancelled_by
+            FOREIGN KEY (cancelled_by) REFERENCES USERS (user_id) ON DELETE SET NULL`
+    },
+    {
+        type: "INDEX",
+        name: "IDX_EVENTS_CANCELLED_BY",
+        sql: `CREATE INDEX idx_events_cancelled_by ON EVENTS (cancelled_by)`
+    },
+    // 2. NOTIFICATIONS Table
+    {
+        type: "TABLE",
+        name: "NOTIFICATIONS",
+        sql: `
+            CREATE TABLE NOTIFICATIONS (
+                notification_id       NUMBER GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+                user_id               NUMBER                           NOT NULL,
+                event_id              NUMBER                           NOT NULL,
+                booking_id            VARCHAR2(30)                     NULL,
+                type                  VARCHAR2(30) DEFAULT 'EVENT_CANCELLED' NOT NULL,
+                title                 VARCHAR2(200)                    NOT NULL,
+                message               VARCHAR2(1000)                   NOT NULL,
+                status                VARCHAR2(20) DEFAULT 'UNREAD'    NOT NULL,
+                created_at            TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                read_at               TIMESTAMP WITH TIME ZONE         NULL,
+
+                CONSTRAINT pk_notifications PRIMARY KEY (notification_id),
+                CONSTRAINT fk_notif_user FOREIGN KEY (user_id) REFERENCES USERS (user_id) ON DELETE CASCADE,
+                CONSTRAINT fk_notif_event FOREIGN KEY (event_id) REFERENCES EVENTS (event_id),
+                CONSTRAINT fk_notif_booking FOREIGN KEY (booking_id) REFERENCES BOOKINGS (booking_id) ON DELETE SET NULL,
+                CONSTRAINT chk_notif_status CHECK (status IN ('UNREAD', 'READ', 'DISMISSED')),
+                CONSTRAINT chk_notif_type CHECK (type IN ('EVENT_CANCELLED', 'EVENT_UPDATED', 'GENERAL')),
+                CONSTRAINT uq_notif_booking_type UNIQUE (user_id, booking_id, type)
+            )
+        `
+    },
+    { type: "INDEX", name: "IDX_NOTIF_USER_STATUS", sql: `CREATE INDEX idx_notif_user_status ON NOTIFICATIONS (user_id, status)` },
+    { type: "INDEX", name: "IDX_NOTIF_EVENT", sql: `CREATE INDEX idx_notif_event ON NOTIFICATIONS (event_id)` },
+    { type: "INDEX", name: "IDX_NOTIF_BOOKING", sql: `CREATE INDEX idx_notif_booking ON NOTIFICATIONS (booking_id)` },
+    // 3. EVENT_REFUNDS Table
+    {
+        type: "TABLE",
+        name: "EVENT_REFUNDS",
+        sql: `
+            CREATE TABLE EVENT_REFUNDS (
+                refund_id             NUMBER GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+                booking_id            VARCHAR2(30)                     NOT NULL,
+                event_id              NUMBER                           NOT NULL,
+                user_id               NUMBER                           NOT NULL,
+                refund_amount         NUMBER(12, 2)                    NOT NULL,
+                refund_mode           VARCHAR2(30) DEFAULT 'SIMULATED' NOT NULL,
+                status                VARCHAR2(30) DEFAULT 'SIMULATED_RECORDED' NOT NULL,
+                reason                VARCHAR2(500) DEFAULT 'Event cancelled by organizer' NOT NULL,
+                created_at            TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                updated_at            TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+
+                CONSTRAINT pk_event_refunds PRIMARY KEY (refund_id),
+                CONSTRAINT uq_refunds_booking UNIQUE (booking_id),
+                CONSTRAINT fk_refunds_booking FOREIGN KEY (booking_id) REFERENCES BOOKINGS (booking_id),
+                CONSTRAINT fk_refunds_event FOREIGN KEY (event_id) REFERENCES EVENTS (event_id),
+                CONSTRAINT fk_refunds_user FOREIGN KEY (user_id) REFERENCES USERS (user_id),
+                CONSTRAINT chk_refunds_amount CHECK (refund_amount > 0),
+                CONSTRAINT chk_refunds_mode CHECK (refund_mode IN ('SIMULATED', 'NO_PAYMENT_GATEWAY')),
+                CONSTRAINT chk_refunds_status CHECK (status IN ('SIMULATED_RECORDED', 'SIMULATED_PROCESSED', 'SIMULATED_VOID'))
+            )
+        `
+    },
+    { type: "INDEX", name: "IDX_REFUNDS_EVENT", sql: `CREATE INDEX idx_refunds_event ON EVENT_REFUNDS (event_id)` },
+    { type: "INDEX", name: "IDX_REFUNDS_USER", sql: `CREATE INDEX idx_refunds_user ON EVENT_REFUNDS (user_id)` },
+    { type: "INDEX", name: "IDX_REFUNDS_STATUS", sql: `CREATE INDEX idx_refunds_status ON EVENT_REFUNDS (status)` }
 ];
 
 // ---------------------------------------------------------------------------
@@ -329,6 +513,15 @@ async function getExistingConstraints(connection) {
     return map;
 }
 
+async function getExistingColumns(connection, tableName) {
+    const res = await connection.execute(
+        `SELECT column_name FROM user_tab_cols WHERE table_name = :tName`,
+        { tName: tableName.toUpperCase() },
+        { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+    return new Set(res.rows.map(r => r.COLUMN_NAME));
+}
+
 // ---------------------------------------------------------------------------
 // Tracker Bootstrap
 // ---------------------------------------------------------------------------
@@ -351,15 +544,10 @@ async function bootstrapTracker(connection) {
         console.log("[Migrator] SCHEMA_VERSION created successfully.");
     } else {
         // Validate columns of existing SCHEMA_VERSION table
-        const colsRes = await connection.execute(
-            `SELECT column_name, data_type FROM user_tab_cols WHERE table_name = 'SCHEMA_VERSION'`,
-            [],
-            { outFormat: oracledb.OUT_FORMAT_OBJECT }
-        );
-        const colMap = new Map(colsRes.rows.map(r => [r.COLUMN_NAME, r.DATA_TYPE]));
+        const colSet = await getExistingColumns(connection, "SCHEMA_VERSION");
         const requiredCols = ["VERSION_ID", "VERSION_LABEL", "APPLIED_AT", "CHECKSUM", "STATUS", "EXECUTION_LOG"];
         for (const col of requiredCols) {
-            if (!colMap.has(col)) {
+            if (!colSet.has(col)) {
                 throw new Error(`INVALID_TRACKER_TABLE_ERROR: Existing SCHEMA_VERSION table is missing column ${col}.`);
             }
         }
@@ -394,6 +582,7 @@ async function verifyCompleteSchema(connection) {
         uniqueConstraints: [],
         checkConstraints: [],
         secondaryIndexes: [],
+        columns: [],
         allValid: true,
         errors: []
     };
@@ -403,7 +592,7 @@ async function verifyCompleteSchema(connection) {
     const indexes = await getExistingIndexes(connection);
     const constraints = await getExistingConstraints(connection);
 
-    // 1. Tables (6)
+    // 1. Tables (8)
     for (const tbl of EXPECTED_TABLES) {
         if (!tables.has(tbl)) {
             auditReport.allValid = false;
@@ -437,7 +626,7 @@ async function verifyCompleteSchema(connection) {
         }
     }
 
-    // 3. Primary Keys (6)
+    // 3. Primary Keys (8)
     for (const pk of EXPECTED_PRIMARY_KEYS) {
         const c = constraints.get(pk.name);
         if (!c || c.CONSTRAINT_TYPE !== "P" || c.STATUS !== "ENABLED") {
@@ -448,7 +637,7 @@ async function verifyCompleteSchema(connection) {
         }
     }
 
-    // 4. Foreign Keys (5)
+    // 4. Foreign Keys (12)
     for (const fk of EXPECTED_FOREIGN_KEYS) {
         const c = constraints.get(fk.name);
         if (!c || c.CONSTRAINT_TYPE !== "R" || c.STATUS !== "ENABLED") {
@@ -469,7 +658,7 @@ async function verifyCompleteSchema(connection) {
         }
     }
 
-    // 5. Unique Constraints (2)
+    // 5. Unique Constraints (4)
     for (const uk of EXPECTED_UNIQUE_CONSTRAINTS) {
         const c = constraints.get(uk.name);
         if (!c || c.CONSTRAINT_TYPE !== "U" || c.STATUS !== "ENABLED") {
@@ -480,7 +669,7 @@ async function verifyCompleteSchema(connection) {
         }
     }
 
-    // 6. Check Constraints (14)
+    // 6. Check Constraints (19)
     for (const chk of EXPECTED_CHECK_CONSTRAINTS) {
         const c = constraints.get(chk.name);
         if (!c || c.CONSTRAINT_TYPE !== "C" || c.STATUS !== "ENABLED") {
@@ -491,7 +680,7 @@ async function verifyCompleteSchema(connection) {
         }
     }
 
-    // 7. Secondary Indexes (9)
+    // 7. Secondary Indexes (16)
     for (const idx of EXPECTED_SECONDARY_INDEXES) {
         const i = indexes.get(idx.name);
         if (!i || i.STATUS !== "VALID") {
@@ -502,7 +691,50 @@ async function verifyCompleteSchema(connection) {
         }
     }
 
+    // 8. Event Audit Columns on EVENTS
+    if (tables.has("EVENTS")) {
+        const eventCols = await getExistingColumns(connection, "EVENTS");
+        for (const col of EXPECTED_EVENTS_AUDIT_COLUMNS) {
+            if (!eventCols.has(col)) {
+                auditReport.allValid = false;
+                auditReport.errors.push(`Missing Audit Column on EVENTS: ${col}`);
+            } else {
+                auditReport.columns.push({ table: "EVENTS", column: col, status: "PRESENT" });
+            }
+        }
+    }
+
     return auditReport;
+}
+
+// ---------------------------------------------------------------------------
+// Step Execution Helper
+// ---------------------------------------------------------------------------
+
+async function executeDdlStep(connection, step, existingState) {
+    let exists = false;
+    if (step.type === "TABLE") {
+        exists = existingState.tables.has(step.name);
+    } else if (step.type === "SEQUENCE") {
+        exists = existingState.sequences.has(step.name);
+    } else if (step.type === "INDEX") {
+        exists = existingState.indexes.has(step.name);
+    } else if (step.type === "CONSTRAINT") {
+        exists = existingState.constraints.has(step.name);
+    } else if (step.type === "COLUMN_GROUP") {
+        const cols = await getExistingColumns(connection, step.table);
+        exists = cols.has(step.name);
+    }
+
+    if (exists) {
+        console.log(`[Migrator] Object ${step.name} already exists. Verified.`);
+        return { executed: false, name: step.name };
+    }
+
+    console.log(`[Migrator] Executing DDL for ${step.type} ${step.name}...`);
+    await connection.execute(step.sql);
+    console.log(`[Migrator] Successfully applied ${step.type} ${step.name}.`);
+    return { executed: true, name: step.name };
 }
 
 // ---------------------------------------------------------------------------
@@ -511,26 +743,74 @@ async function verifyCompleteSchema(connection) {
 
 async function runMigration(connection) {
     console.log("==================================================");
-    console.log("  EVENTIFY ORACLE SCHEMA MIGRATION ENGINE (v1.0.0)");
+    console.log(`  EVENTIFY ORACLE SCHEMA MIGRATION ENGINE (v${CURRENT_SCHEMA_VERSION_LABEL})`);
     console.log("==================================================");
 
     // 1. Bootstrap Tracker Table & Validate PK Name
     await bootstrapTracker(connection);
 
-    // 2. Query Version State
-    const versionRes = await connection.execute(
+    // 2. Verify / Apply Version 1 (1.0.0)
+    const v1Res = await connection.execute(
         `SELECT version_id, version_label, status, applied_at, execution_log 
          FROM SCHEMA_VERSION 
          WHERE version_id = :vId`,
-        { vId: SCHEMA_VERSION_ID },
+        { vId: SCHEMA_VERSION_1_ID },
         { outFormat: oracledb.OUT_FORMAT_OBJECT }
     );
+    const v1Row = v1Res.rows && v1Res.rows[0];
 
-    const versionRow = versionRes.rows && versionRes.rows[0];
+    if (!v1Row || v1Row.STATUS !== "APPLIED") {
+        console.log("[Migrator] Applying baseline Version 1 (1.0.0)...");
+        await connection.execute(
+            `MERGE INTO SCHEMA_VERSION sv
+             USING (SELECT :vId AS version_id FROM DUAL) src
+             ON (sv.version_id = src.version_id)
+             WHEN MATCHED THEN
+               UPDATE SET status = 'IN_PROGRESS', execution_log = 'v1.0.0 in progress'
+             WHEN NOT MATCHED THEN
+               INSERT (version_id, version_label, checksum, status, execution_log)
+               VALUES (:vId, :vLabel, :csum, 'IN_PROGRESS', 'v1.0.0 started')`,
+            { vId: SCHEMA_VERSION_1_ID, vLabel: SCHEMA_VERSION_1_LABEL, csum: MIGRATION_1_CHECKSUM },
+            { autoCommit: true }
+        );
 
-    // CASE 1: APPLIED -> Verify Schema Integrity (No Mutations)
-    if (versionRow && versionRow.STATUS === "APPLIED") {
-        console.log(`[Migrator] Schema version ${SCHEMA_VERSION_LABEL} is marked as APPLIED.`);
+        const existingStateV1 = {
+            tables: await getExistingTables(connection),
+            sequences: await getExistingSequences(connection),
+            indexes: await getExistingIndexes(connection),
+            constraints: await getExistingConstraints(connection)
+        };
+
+        for (const step of DDL_STEPS_V1) {
+            await executeDdlStep(connection, step, existingStateV1);
+        }
+
+        await connection.execute(
+            `UPDATE SCHEMA_VERSION
+             SET status = 'APPLIED', applied_at = CURRENT_TIMESTAMP,
+                 execution_log = 'Baseline v1.0.0 schema applied'
+             WHERE version_id = :vId`,
+            { vId: SCHEMA_VERSION_1_ID },
+            { autoCommit: true }
+        );
+        console.log("[Migrator] Baseline Version 1 (1.0.0) applied successfully.");
+    } else {
+        console.log(`[Migrator] Baseline Version 1 (1.0.0) verified APPLIED.`);
+    }
+
+    // 3. Check Version 2 (1.1.0)
+    const v2Res = await connection.execute(
+        `SELECT version_id, version_label, status, applied_at, execution_log
+         FROM SCHEMA_VERSION
+         WHERE version_id = :vId`,
+        { vId: SCHEMA_VERSION_2_ID },
+        { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+    const v2Row = v2Res.rows && v2Res.rows[0];
+
+    // CASE: Version 2 is already APPLIED -> Verify Schema Integrity (No Mutations)
+    if (v2Row && v2Row.STATUS === "APPLIED") {
+        console.log(`[Migrator] Schema version ${SCHEMA_VERSION_2_LABEL} is marked as APPLIED.`);
         console.log("[Migrator] Running non-destructive schema drift verification pass...");
         const audit = await verifyCompleteSchema(connection);
 
@@ -540,29 +820,29 @@ async function runMigration(connection) {
             throw new Error(`SCHEMA_DRIFT_ERROR: Schema has diverged from approved definition. ${audit.errors.join("; ")}`);
         }
 
-        console.log("[Migrator] All 6 tables, 1 sequence, 6 PKs, 5 FKs, 2 UKs, 14 checks, and 9 indexes verified intact.");
+        console.log(`[Migrator] All 8 tables, 1 sequence, 8 PKs, 12 FKs, 4 UKs, 19 checks, 16 indexes, and audit columns verified intact.`);
         console.log("[Migrator] Schema is 100% compliant and ready.");
         return {
             status: "ALREADY_APPLIED",
-            version: SCHEMA_VERSION_LABEL,
-            appliedAt: versionRow.APPLIED_AT,
+            version: SCHEMA_VERSION_2_LABEL,
+            appliedAt: v2Row.APPLIED_AT,
             audit
         };
     }
 
-    // CASE 2: IN_PROGRESS / FAILED / NEW -> Validate Existing Objects & Execute
-    if (versionRow && versionRow.STATUS === "FAILED") {
-        console.warn(`[Migrator] Warning: Previous migration run recorded status FAILED.`);
-        console.warn(`[Migrator] Prior execution log: ${versionRow.EXECUTION_LOG}`);
+    // CASE: Version 2 needs to be applied
+    if (v2Row && v2Row.STATUS === "FAILED") {
+        console.warn(`[Migrator] Warning: Previous v1.1.0 run recorded status FAILED.`);
+        console.warn(`[Migrator] Prior execution log: ${v2Row.EXECUTION_LOG}`);
         console.log("[Migrator] Resuming migration after validating existing database state...");
-    } else if (versionRow && versionRow.STATUS === "IN_PROGRESS") {
-        console.warn(`[Migrator] Warning: Previous migration was interrupted in status IN_PROGRESS.`);
+    } else if (v2Row && v2Row.STATUS === "IN_PROGRESS") {
+        console.warn(`[Migrator] Warning: Previous v1.1.0 migration was interrupted in status IN_PROGRESS.`);
         console.log("[Migrator] Resuming migration after validating existing database state...");
     } else {
-        console.log("[Migrator] Starting fresh initial migration for version 1.0.0...");
+        console.log(`[Migrator] Starting migration for Version 2 (${SCHEMA_VERSION_2_LABEL})...`);
     }
 
-    // Record or update IN_PROGRESS
+    // Record or update IN_PROGRESS for Version 2
     await connection.execute(
         `MERGE INTO SCHEMA_VERSION sv
          USING (SELECT :vId AS version_id FROM DUAL) src
@@ -573,9 +853,9 @@ async function runMigration(connection) {
            INSERT (version_id, version_label, checksum, status, execution_log)
            VALUES (:vId, :vLabel, :csum, 'IN_PROGRESS', 'Migration started')`,
         {
-            vId: SCHEMA_VERSION_ID,
-            vLabel: SCHEMA_VERSION_LABEL,
-            csum: MIGRATION_CHECKSUM
+            vId: SCHEMA_VERSION_2_ID,
+            vLabel: SCHEMA_VERSION_2_LABEL,
+            csum: MIGRATION_2_CHECKSUM
         },
         { autoCommit: true }
     );
@@ -583,64 +863,35 @@ async function runMigration(connection) {
     const executedSteps = [];
     const skippedSteps = [];
 
-    const existingTables = await getExistingTables(connection);
-    const existingSeqs = await getExistingSequences(connection);
-    const existingIdxs = await getExistingIndexes(connection);
+    // Execute Missing DDL Steps for Version 2
+    for (const step of DDL_STEPS_V2) {
+        const existingState = {
+            tables: await getExistingTables(connection),
+            sequences: await getExistingSequences(connection),
+            indexes: await getExistingIndexes(connection),
+            constraints: await getExistingConstraints(connection)
+        };
 
-    // Pre-flight check: If any existing booking has numeric ID >= 2001, abort
-    if (existingTables.has("BOOKINGS")) {
-        const conflictRes = await connection.execute(
-            `SELECT booking_id FROM BOOKINGS WHERE TO_NUMBER(SUBSTR(booking_id, 5)) >= 2001`,
-            [],
-            { outFormat: oracledb.OUT_FORMAT_OBJECT }
-        );
-        if (conflictRes.rows && conflictRes.rows.length > 0) {
-            const conflictIds = conflictRes.rows.map(r => r.BOOKING_ID).join(", ");
-            const errMsg = `SEQUENCE_COLLISION_CONFLICT: Booking IDs [${conflictIds}] conflict with seq_booking_id start boundary (2001). Sequence was not modified. Manual review required.`;
-            await connection.execute(
-                `UPDATE SCHEMA_VERSION SET status = 'FAILED', execution_log = :msg WHERE version_id = :vId`,
-                { msg: errMsg.slice(0, 4000), vId: SCHEMA_VERSION_ID },
-                { autoCommit: true }
-            );
-            throw new Error(errMsg);
-        }
-    }
-
-    // Execute Missing DDL Steps
-    for (const step of DDL_STEPS) {
-        let exists = false;
-        if (step.type === "TABLE") {
-            exists = existingTables.has(step.name);
-        } else if (step.type === "SEQUENCE") {
-            exists = existingSeqs.has(step.name);
-        } else if (step.type === "INDEX") {
-            exists = existingIdxs.has(step.name);
-        }
-
-        if (exists) {
-            skippedSteps.push(step.name);
-            console.log(`[Migrator] Object ${step.name} already exists. Verified.`);
-            continue;
-        }
-
-        console.log(`[Migrator] Executing DDL for ${step.type} ${step.name}...`);
         try {
-            await connection.execute(step.sql);
-            executedSteps.push(step.name);
-            console.log(`[Migrator] Successfully created ${step.type} ${step.name}.`);
+            const result = await executeDdlStep(connection, step, existingState);
+            if (result.executed) {
+                executedSteps.push(result.name);
+            } else {
+                skippedSteps.push(result.name);
+            }
         } catch (stepErr) {
             const errLog = `Failed at step ${step.type} ${step.name}: ${stepErr.message}`;
             console.error(`[Migrator] ${errLog}`);
             await connection.execute(
                 `UPDATE SCHEMA_VERSION SET status = 'FAILED', execution_log = :log WHERE version_id = :vId`,
-                { log: errLog.slice(0, 4000), vId: SCHEMA_VERSION_ID },
+                { log: errLog.slice(0, 4000), vId: SCHEMA_VERSION_2_ID },
                 { autoCommit: true }
             );
             throw stepErr;
         }
     }
 
-    // 4. Post-Execution Audit
+    // Post-Execution Audit
     console.log("[Migrator] Running post-migration itemized verification audit...");
     const audit = await verifyCompleteSchema(connection);
 
@@ -649,21 +900,21 @@ async function runMigration(connection) {
         console.error(`[Migrator] ${failureLog}`);
         await connection.execute(
             `UPDATE SCHEMA_VERSION SET status = 'FAILED', execution_log = :log WHERE version_id = :vId`,
-            { log: failureLog.slice(0, 4000), vId: SCHEMA_VERSION_ID },
+            { log: failureLog.slice(0, 4000), vId: SCHEMA_VERSION_2_ID },
             { autoCommit: true }
         );
         throw new Error(failureLog);
     }
 
-    // 5. Attestation
-    const summaryLog = `Verified: 6 tables, 1 sequence, 6 PKs, 5 FKs, 2 UKs, 14 checks, 9 indexes. Executed: ${executedSteps.length}, Skipped: ${skippedSteps.length}.`;
+    // Attestation
+    const summaryLog = `Verified: 8 tables, 1 sequence, 8 PKs, 12 FKs, 4 UKs, 19 checks, 16 indexes, 3 audit columns. Executed: ${executedSteps.length}, Skipped: ${skippedSteps.length}.`;
     await connection.execute(
-        `UPDATE SCHEMA_VERSION 
-         SET status = 'APPLIED', 
-             applied_at = CURRENT_TIMESTAMP, 
-             execution_log = :log 
+        `UPDATE SCHEMA_VERSION
+         SET status = 'APPLIED',
+             applied_at = CURRENT_TIMESTAMP,
+             execution_log = :log
          WHERE version_id = :vId`,
-        { log: summaryLog.slice(0, 4000), vId: SCHEMA_VERSION_ID },
+        { log: summaryLog.slice(0, 4000), vId: SCHEMA_VERSION_2_ID },
         { autoCommit: true }
     );
 
@@ -674,7 +925,7 @@ async function runMigration(connection) {
 
     return {
         status: "APPLIED",
-        version: SCHEMA_VERSION_LABEL,
+        version: SCHEMA_VERSION_2_LABEL,
         executedSteps,
         skippedSteps,
         audit

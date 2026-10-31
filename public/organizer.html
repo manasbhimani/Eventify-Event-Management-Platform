@@ -172,6 +172,158 @@
             Oracle-backed storage: events created here are persisted in Oracle Database and available platform-wide.
         </p>
 
+        <!-- Edit Event Modal Backdrop & Dialog -->
+        <div id="edit-modal-backdrop" class="modal-backdrop" hidden>
+            <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="edit-dialog-heading">
+                <div class="form-heading">
+                    <div>
+                        <h2 id="edit-dialog-heading">Edit Event</h2>
+                        <p class="muted">Update details for this event listing.</p>
+                    </div>
+
+                    <button id="close-edit-modal" class="close-button"
+                        type="button" aria-label="Close edit modal">✕</button>
+                </div>
+
+                <div id="edit-locked-notice" class="locked-fields-notice" hidden>
+                    <span class="notice-icon">🔒</span>
+                    <div>
+                        <p class="notice-title">Title & Ticket Price Locked</p>
+                        <p id="edit-locked-notice-text" class="notice-body">
+                            Tickets have already been booked for this event. To protect existing attendee bookings, the event title and ticket price cannot be changed.
+                        </p>
+                    </div>
+                </div>
+
+                <form id="edit-event-form">
+                    <input type="hidden" id="edit-event-id">
+
+                    <div class="form-grid">
+                        <div class="form-field full-width">
+                            <label for="edit-event-title">Event name</label>
+                            <input id="edit-event-title" type="text"
+                                maxlength="100" required
+                                placeholder="e.g. Web Development Bootcamp">
+                        </div>
+
+                        <div class="form-field">
+                            <label for="edit-event-category">Category</label>
+                            <select id="edit-event-category" required>
+                                <option value="" disabled selected>Loading categories...</option>
+                            </select>
+                        </div>
+
+                        <div class="form-field">
+                            <label for="edit-event-city">City</label>
+                            <input id="edit-event-city" type="text"
+                                maxlength="80" required placeholder="e.g. Surat">
+                        </div>
+
+                        <div class="form-field full-width">
+                            <label for="edit-event-venue">Venue</label>
+                            <input id="edit-event-venue" type="text"
+                                maxlength="150" required
+                                placeholder="Enter the event venue">
+                        </div>
+
+                        <div class="form-field">
+                            <label for="edit-event-date">Event date</label>
+                            <input id="edit-event-date" type="date" required>
+                        </div>
+
+                        <div class="form-field">
+                            <label for="edit-event-time">Start time <span class="muted font-normal">(optional)</span></label>
+                            <input id="edit-event-time" type="time">
+                        </div>
+
+                        <div class="form-field">
+                            <label for="edit-event-price">Ticket price (₹)</label>
+                            <input id="edit-event-price" type="number"
+                                min="0" max="10000000" step="1" required>
+                        </div>
+
+                        <div class="form-field">
+                            <label for="edit-event-capacity">Ticket quantity / Capacity</label>
+                            <input id="edit-event-capacity" type="number"
+                                min="1" max="1000000" required>
+                        </div>
+
+                        <div class="form-field full-width">
+                            <label for="edit-event-image">Image URL <span class="muted font-normal">(optional)</span></label>
+                            <input id="edit-event-image" type="url"
+                                maxlength="500" placeholder="https://images.unsplash.com/...">
+                        </div>
+
+                        <div class="form-field full-width">
+                            <label for="edit-event-description">Description</label>
+                            <textarea id="edit-event-description"
+                                maxlength="1500" rows="4"
+                                placeholder="Describe your event..."></textarea>
+                        </div>
+                    </div>
+
+                    <p id="edit-form-message" class="form-message"
+                        role="status"></p>
+
+                    <div class="modal-actions">
+                        <button type="button" id="cancel-edit-btn" class="cancel-button">
+                            Cancel
+                        </button>
+                        <button type="submit" id="save-edit-btn" class="primary-button">
+                            Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Cancel Event Confirmation Modal Backdrop & Dialog -->
+        <div id="cancel-modal-backdrop" class="modal-backdrop" hidden>
+            <div class="modal-dialog modal-dialog-sm" role="dialog" aria-modal="true" aria-labelledby="cancel-dialog-heading">
+                <div class="form-heading">
+                    <div>
+                        <h2 id="cancel-dialog-heading">Cancel Event</h2>
+                        <p class="muted">Confirm cancellation for this event listing.</p>
+                    </div>
+
+                    <button id="close-cancel-modal" class="close-button"
+                        type="button" aria-label="Close cancel modal">✕</button>
+                </div>
+
+                <div class="cancel-warning-box">
+                    <span class="warning-icon">⚠️</span>
+                    <div>
+                        <p class="warning-title">Important Cancellation Notice</p>
+                        <p class="warning-body">
+                            Cancelling this event is immediate and final. All confirmed attendee bookings will be cancelled, any simulated refunds recorded, and all affected attendees will be notified. This event will no longer accept new bookings.
+                        </p>
+                    </div>
+                </div>
+
+                <form id="cancel-event-form">
+                    <input type="hidden" id="cancel-event-id">
+
+                    <div class="form-field full-width">
+                        <label for="cancel-event-reason">Cancellation Reason <span class="muted font-normal">(optional, max 500 chars)</span></label>
+                        <textarea id="cancel-event-reason"
+                            maxlength="500" rows="3"
+                            placeholder="Provide an explanation to attendees (e.g. Scheduling conflict, venue unavailable)..."></textarea>
+                    </div>
+
+                    <p id="cancel-form-message" class="form-message" role="status"></p>
+
+                    <div class="modal-actions">
+                        <button type="button" id="abort-cancel-btn" class="cancel-button">
+                            Keep Event
+                        </button>
+                        <button type="submit" id="confirm-cancel-btn" class="primary-button danger-button">
+                            Yes, Cancel Event
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
     </main>
 
     <footer class="footer">

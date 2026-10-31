@@ -31,8 +31,9 @@ const healthRouter     = require("./src/routes/health.routes");
 const categoriesRouter = require("./src/routes/categories.routes");
 const eventsRouter     = require("./src/routes/events.routes");
 const authRouter       = require("./src/routes/auth.routes");
-const bookingsRouter   = require("./src/routes/bookings.routes");
-const adminRouter      = require("./src/routes/admin.routes");
+const bookingsRouter      = require("./src/routes/bookings.routes");
+const adminRouter         = require("./src/routes/admin.routes");
+const notificationsRouter = require("./src/routes/notifications.routes");
 
 // ---------------------------------------------------------------------------
 // Auth / Session middleware
@@ -94,8 +95,9 @@ app.use("/api/health",      healthRouter(getIsConnected));
 app.use("/api/categories",  categoriesRouter);
 app.use("/api/events",      eventsRouter);
 app.use("/api/auth",        authRouter);
-app.use("/api/bookings",    bookingsRouter);
-app.use("/api/admin",       adminRouter);
+app.use("/api/bookings",      bookingsRouter);
+app.use("/api/admin",         adminRouter);
+app.use("/api/notifications", notificationsRouter);
 
 // ---------------------------------------------------------------------------
 // 404 handler for unknown API routes

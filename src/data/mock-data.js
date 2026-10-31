@@ -108,9 +108,10 @@ const seedCategories = [
  * Passwords are pre-hashed using bcryptjs (cost factor 10).
  *
  * Seed Credentials:
- *   - Admin:     admin@eventify.local     / Admin@123
- *   - Organizer: organizer@eventify.local / Organizer@123
- *   - Attendee:  attendee@eventify.local  / Attendee@123
+ *   - Admin:       admin@eventify.local      / Admin@123
+ *   - Organizer 1: organizer@eventify.local  / Organizer@123
+ *   - Organizer 2: organizer2@eventify.local / Organizer2@123
+ *   - Attendee:    attendee@eventify.local   / Attendee@123
  */
 const seedUsers = [
     {
@@ -136,6 +137,14 @@ const seedUsers = [
         passwordHash: "$2b$10$orMrAVvVnKeornFI0qfASe1fs5Fgq4pG4v5ocgGC174vpGBuLhgra",
         role: "ATTENDEE",
         createdAt: "2026-10-10T14:15:00.000Z"
+    },
+    {
+        id: 4,
+        name: "Priya Organizer",
+        email: "organizer2@eventify.local",
+        passwordHash: "$2b$10$D/1qmtPll4vQJzqcI8QlkOTkzl/CxNdMX1EdLtTcMsto/DV5oTwuS",
+        role: "ORGANIZER",
+        createdAt: "2026-10-12T11:00:00.000Z"
     }
 ];
 

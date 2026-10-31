@@ -135,8 +135,9 @@
     /**
      * Render the loaded event onto the page safely using DOM elements.
      * @param {Object} event
+     * @param {Object|null} currentUser
      */
-    function renderEvent(event) {
+    function renderEvent(event, currentUser = null) {
         document.title = `${event.title || "Event Details"} | Eventify`;
 
         eventContent.innerHTML = "";
@@ -202,169 +203,227 @@
         main.appendChild(description);
 
         // 2b. Booking card aside
+        const isOwner = Boolean(
+            currentUser &&
+            event.creatorId !== null &&
+            event.creatorId !== undefined &&
+            Number(currentUser.id) === Number(event.creatorId)
+        );
+
         const aside = document.createElement("aside");
-        aside.className = "booking-card";
 
-        const bookingEyebrow = document.createElement("p");
-        bookingEyebrow.className = "eyebrow";
-        bookingEyebrow.textContent = "YOUR NEXT EXPERIENCE";
+        if (isOwner) {
+            // Organizer complimentary entry pass
+            aside.className = "booking-card organizer-pass-card";
 
-        const priceP = document.createElement("p");
-        priceP.className = "price";
-        const priceNum = Number(event.price) || 0;
-        priceP.textContent = priceNum === 0 ? "Free" : `₹${priceNum}`;
+            const bookingEyebrow = document.createElement("p");
+            bookingEyebrow.className = "eyebrow";
+            bookingEyebrow.textContent = "ORGANIZER PASS";
 
-        const priceMuted = document.createElement("p");
-        priceMuted.className = "muted";
-        priceMuted.textContent = "Price per ticket";
+            const passBadge = document.createElement("div");
+            passBadge.className = "organizer-pass-badge";
+            passBadge.innerHTML = "<span>🎖️</span><span>Host Entry Guaranteed</span>";
 
-        // Booking form
-        const form = document.createElement("form");
-        form.id = "booking-form";
+            const priceP = document.createElement("p");
+            priceP.className = "price";
+            priceP.textContent = "Complimentary";
 
-        const qtyLabel = document.createElement("label");
-        qtyLabel.htmlFor = "ticket-quantity";
-        qtyLabel.textContent = "Number of tickets";
+            const priceMuted = document.createElement("p");
+            priceMuted.className = "muted";
+            priceMuted.textContent = "Included with Event Ownership";
 
-        const qtySelect = document.createElement("select");
-        qtySelect.id = "ticket-quantity";
-        qtySelect.name = "quantity";
+            const passContent = document.createElement("div");
+            passContent.className = "organizer-pass-content";
 
-        const maxTickets = Math.min(5, Math.max(1, capacityNum));
-        for (let i = 1; i <= maxTickets; i++) {
-            const opt = document.createElement("option");
-            opt.value = String(i);
-            opt.textContent = `${i} ticket${i === 1 ? "" : "s"}`;
-            qtySelect.appendChild(opt);
+            const descP = document.createElement("p");
+            descP.className = "organizer-pass-desc";
+            descP.textContent = "You are the organizer of this event. Organizers receive complimentary entry and do not need to purchase a ticket or reserve seats.";
+
+            const manageBtn = document.createElement("a");
+            manageBtn.href = "organizer.html";
+            manageBtn.className = "btn btn-primary";
+            manageBtn.textContent = "Manage in Organizer Dashboard →";
+
+            const noteP = document.createElement("p");
+            noteP.className = "booking-note";
+            noteP.textContent = "Access attendee lists, event details, and management tools anytime.";
+
+            passContent.appendChild(descP);
+            passContent.appendChild(manageBtn);
+            passContent.appendChild(noteP);
+
+            aside.appendChild(bookingEyebrow);
+            aside.appendChild(passBadge);
+            aside.appendChild(priceP);
+            aside.appendChild(priceMuted);
+            aside.appendChild(passContent);
+        } else {
+            // Standard Attendee / Visitor booking form
+            aside.className = "booking-card";
+
+            const bookingEyebrow = document.createElement("p");
+            bookingEyebrow.className = "eyebrow";
+            bookingEyebrow.textContent = "YOUR NEXT EXPERIENCE";
+
+            const priceP = document.createElement("p");
+            priceP.className = "price";
+            const priceNum = Number(event.price) || 0;
+            priceP.textContent = priceNum === 0 ? "Free" : `₹${priceNum}`;
+
+            const priceMuted = document.createElement("p");
+            priceMuted.className = "muted";
+            priceMuted.textContent = "Price per ticket";
+
+            // Booking form
+            const form = document.createElement("form");
+            form.id = "booking-form";
+
+            const qtyLabel = document.createElement("label");
+            qtyLabel.htmlFor = "ticket-quantity";
+            qtyLabel.textContent = "Number of tickets";
+
+            const qtySelect = document.createElement("select");
+            qtySelect.id = "ticket-quantity";
+            qtySelect.name = "quantity";
+
+            const maxTickets = Math.min(5, Math.max(1, capacityNum));
+            for (let i = 1; i <= maxTickets; i++) {
+                const opt = document.createElement("option");
+                opt.value = String(i);
+                opt.textContent = `${i} ticket${i === 1 ? "" : "s"}`;
+                qtySelect.appendChild(opt);
+            }
+
+            const totalDiv = document.createElement("div");
+            totalDiv.className = "booking-total";
+
+            const totalSpan = document.createElement("span");
+            totalSpan.textContent = "Total";
+
+            const totalStrong = document.createElement("strong");
+            totalStrong.id = "booking-total";
+            totalStrong.textContent = priceNum === 0 ? "Free" : `₹${priceNum}`;
+
+            totalDiv.appendChild(totalSpan);
+            totalDiv.appendChild(totalStrong);
+
+            const submitBtn = document.createElement("button");
+            submitBtn.className = "btn btn-primary";
+            submitBtn.type = "submit";
+            submitBtn.textContent = "Continue to booking";
+
+            const noteP = document.createElement("p");
+            noteP.className = "booking-note";
+            noteP.textContent = "Instant confirmation — view anytime in My Bookings.";
+
+            const messageP = document.createElement("p");
+            messageP.className = "booking-message";
+            messageP.id = "booking-message";
+            messageP.setAttribute("role", "status");
+            messageP.setAttribute("aria-live", "polite");
+
+            form.appendChild(qtyLabel);
+            form.appendChild(qtySelect);
+            form.appendChild(totalDiv);
+            form.appendChild(submitBtn);
+            form.appendChild(noteP);
+            form.appendChild(messageP);
+
+            aside.appendChild(bookingEyebrow);
+            aside.appendChild(priceP);
+            aside.appendChild(priceMuted);
+            aside.appendChild(form);
+
+            // --- Interactive Form Handlers ---
+            qtySelect.addEventListener("change", function () {
+                const qty = Number(qtySelect.value) || 1;
+                const total = priceNum * qty;
+                totalStrong.textContent = total === 0 ? "Free" : `₹${total}`;
+            });
+
+            let isSubmitting = false;
+
+            form.addEventListener("submit", async function (e) {
+                e.preventDefault();
+                if (isSubmitting) return;
+
+                const qty = Number(qtySelect.value);
+                if (!Number.isInteger(qty) || qty < 1) {
+                    messageP.textContent = "Please select a valid ticket quantity (at least 1).";
+                    messageP.className = "booking-message error";
+                    return;
+                }
+
+                isSubmitting = true;
+                submitBtn.disabled = true;
+                submitBtn.textContent = "Reserving tickets...";
+                messageP.textContent = "Connecting to server...";
+                messageP.className = "booking-message";
+
+                try {
+                    const response = await window.api.createBooking(event.id, qty);
+
+                    if (response && response.success && response.data) {
+                        const booking = response.data;
+                        messageP.className = "booking-message success";
+                        messageP.innerHTML = "";
+
+                        const successText = document.createElement("span");
+                        const ticketsText = `${booking.quantity} ticket${booking.quantity === 1 ? "" : "s"}`;
+                        const costText = booking.amount === 0 ? "Free" : `₹${Number(booking.amount).toLocaleString("en-IN")}`;
+                        successText.textContent = `✓ Booking confirmed! Reference ID: ${booking.id} (${ticketsText}, ${costText}).`;
+
+                        const viewLink = document.createElement("a");
+                        viewLink.href = "bookings.html";
+                        viewLink.textContent = "View in My Bookings →";
+                        viewLink.style.display = "block";
+                        viewLink.style.marginTop = "6px";
+                        viewLink.style.color = "#86efac";
+                        viewLink.style.fontWeight = "600";
+                        viewLink.style.textDecoration = "underline";
+
+                        messageP.appendChild(successText);
+                        messageP.appendChild(viewLink);
+
+                        noteP.textContent = `Reservation recorded for ${event.title}.`;
+                        submitBtn.textContent = "Book More Tickets";
+                        submitBtn.disabled = false;
+                    } else {
+                        throw new Error((response && response.message) || "Booking confirmation failed.");
+                    }
+                } catch (err) {
+                    console.error("[Booking] Creation failed:", err);
+                    messageP.className = "booking-message error";
+                    if (err.status === 401) {
+                        messageP.innerHTML = "";
+                        const authText = document.createElement("span");
+                        authText.textContent = "Please sign in to reserve your tickets. ";
+                        const loginLink = document.createElement("a");
+                        loginLink.href = `login.html?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+                        loginLink.textContent = "Sign In Now →";
+                        loginLink.style.color = "#a78bfa";
+                        loginLink.style.fontWeight = "600";
+                        loginLink.style.textDecoration = "underline";
+                        messageP.appendChild(authText);
+                        messageP.appendChild(loginLink);
+                    } else if (err.code === "OWNER_BOOKING_PROHIBITED" || (err.data && err.data.code === "OWNER_BOOKING_PROHIBITED")) {
+                        messageP.textContent = err.message || "Event organizers receive complimentary entry and cannot book their own event.";
+                    } else {
+                        messageP.textContent = err.message || "Unable to reserve tickets. Please try again.";
+                    }
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = "Continue to booking";
+                } finally {
+                    isSubmitting = false;
+                }
+            });
         }
-
-        const totalDiv = document.createElement("div");
-        totalDiv.className = "booking-total";
-
-        const totalSpan = document.createElement("span");
-        totalSpan.textContent = "Total";
-
-        const totalStrong = document.createElement("strong");
-        totalStrong.id = "booking-total";
-        totalStrong.textContent = priceNum === 0 ? "Free" : `₹${priceNum}`;
-
-        totalDiv.appendChild(totalSpan);
-        totalDiv.appendChild(totalStrong);
-
-        const submitBtn = document.createElement("button");
-        submitBtn.className = "btn btn-primary";
-        submitBtn.type = "submit";
-        submitBtn.textContent = "Continue to booking";
-
-        const noteP = document.createElement("p");
-        noteP.className = "booking-note";
-        noteP.textContent = "Instant confirmation — view anytime in My Bookings.";
-
-        const messageP = document.createElement("p");
-        messageP.className = "booking-message";
-        messageP.id = "booking-message";
-        messageP.setAttribute("role", "status");
-        messageP.setAttribute("aria-live", "polite");
-
-        form.appendChild(qtyLabel);
-        form.appendChild(qtySelect);
-        form.appendChild(totalDiv);
-        form.appendChild(submitBtn);
-        form.appendChild(noteP);
-        form.appendChild(messageP);
-
-        aside.appendChild(bookingEyebrow);
-        aside.appendChild(priceP);
-        aside.appendChild(priceMuted);
-        aside.appendChild(form);
 
         layout.appendChild(main);
         layout.appendChild(aside);
 
         eventContent.appendChild(banner);
         eventContent.appendChild(layout);
-
-        // --- Interactive Form Handlers ---
-        qtySelect.addEventListener("change", function () {
-            const qty = Number(qtySelect.value) || 1;
-            const total = priceNum * qty;
-            totalStrong.textContent = total === 0 ? "Free" : `₹${total}`;
-        });
-
-        let isSubmitting = false;
-
-        form.addEventListener("submit", async function (e) {
-            e.preventDefault();
-            if (isSubmitting) return;
-
-            const qty = Number(qtySelect.value);
-            if (!Number.isInteger(qty) || qty < 1) {
-                messageP.textContent = "Please select a valid ticket quantity (at least 1).";
-                messageP.className = "booking-message error";
-                return;
-            }
-
-            isSubmitting = true;
-            submitBtn.disabled = true;
-            submitBtn.textContent = "Reserving tickets...";
-            messageP.textContent = "Connecting to server...";
-            messageP.className = "booking-message";
-
-            try {
-                const response = await window.api.createBooking(event.id, qty);
-
-                if (response && response.success && response.data) {
-                    const booking = response.data;
-                    messageP.className = "booking-message success";
-                    messageP.innerHTML = "";
-
-                    const successText = document.createElement("span");
-                    const ticketsText = `${booking.quantity} ticket${booking.quantity === 1 ? "" : "s"}`;
-                    const costText = booking.amount === 0 ? "Free" : `₹${Number(booking.amount).toLocaleString("en-IN")}`;
-                    successText.textContent = `✓ Booking confirmed! Reference ID: ${booking.id} (${ticketsText}, ${costText}).`;
-
-                    const viewLink = document.createElement("a");
-                    viewLink.href = "bookings.html";
-                    viewLink.textContent = "View in My Bookings →";
-                    viewLink.style.display = "block";
-                    viewLink.style.marginTop = "6px";
-                    viewLink.style.color = "#86efac";
-                    viewLink.style.fontWeight = "600";
-                    viewLink.style.textDecoration = "underline";
-
-                    messageP.appendChild(successText);
-                    messageP.appendChild(viewLink);
-
-                    noteP.textContent = `Reservation recorded for ${event.title}.`;
-                    submitBtn.textContent = "Book More Tickets";
-                    submitBtn.disabled = false;
-                } else {
-                    throw new Error((response && response.message) || "Booking confirmation failed.");
-                }
-            } catch (err) {
-                console.error("[Booking] Creation failed:", err);
-                messageP.className = "booking-message error";
-                if (err.status === 401) {
-                    messageP.innerHTML = "";
-                    const authText = document.createElement("span");
-                    authText.textContent = "Please sign in to reserve your tickets. ";
-                    const loginLink = document.createElement("a");
-                    loginLink.href = `login.html?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`;
-                    loginLink.textContent = "Sign In Now →";
-                    loginLink.style.color = "#a78bfa";
-                    loginLink.style.fontWeight = "600";
-                    loginLink.style.textDecoration = "underline";
-                    messageP.appendChild(authText);
-                    messageP.appendChild(loginLink);
-                } else {
-                    messageP.textContent = err.message || "Unable to reserve tickets. Please try again.";
-                }
-                submitBtn.disabled = false;
-                submitBtn.textContent = "Continue to booking";
-            } finally {
-                isSubmitting = false;
-            }
-        });
     }
 
     /**
@@ -379,9 +438,15 @@
         showLoading();
 
         try {
-            const response = await window.api.getEventById(rawId);
-            if (response && response.data) {
-                renderEvent(response.data);
+            const [eventRes, userRes] = await Promise.all([
+                window.api.getEventById(rawId),
+                window.api.getMe().catch(() => null)
+            ]);
+
+            const currentUser = (userRes && userRes.success && userRes.user) ? userRes.user : null;
+
+            if (eventRes && eventRes.data) {
+                renderEvent(eventRes.data, currentUser);
             } else {
                 showError("Event Not Found", "The requested event could not be found.", false);
             }
